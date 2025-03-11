@@ -1,9 +1,26 @@
 [package]
 name = "siteprobe"
 version = "0.1.0"
+license = "MIT"
 edition = "2024"
 authors = ["Martin Mahner <martin@elephant.house>"]
-description = "Fetch sitemap urls."
+description = "Siteprobe is a Rust-based CLI tool that fetches all URLs from a given `sitemap.xml` url, checks their existence, and generates a performance report. It supports various features such as authentication, concurrency control, caching bypass, and more."
+repository = "https://github.com/bartTC/siteprobe"
+readme = "README.md"
+categories = [
+    "command-line-utilities",
+    "web-programming",
+    "network-programming",
+    "parsing",
+    "web-programming::http-client"
+]
+keywords = [
+    "sitemap",
+    "url-checker",
+    "http-monitoring",
+    "web-crawler",
+    "performance",
+]
 
 [dependencies]
 base64 = "0.22.1"
