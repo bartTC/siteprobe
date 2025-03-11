@@ -6,9 +6,10 @@ features such as authentication, concurrency control, caching bypass, and more.
 
 ## Features
 
-- Fetch and parse `sitemap.xml` to extract URLs
+- Fetch and parse sitemap.xml to extract URLs, including nested Sitemap Index files
+  recursively.
 - Check the existence and response times of each URL
-- Generate a detailed performance report (`report.csv`)
+- Generate a detailed performance report (e.g. `report.csv`)
 - Support for Basic Authentication
 - Adjustable concurrency limits for request handling
 - Configurable request timeout settings
@@ -16,7 +17,7 @@ features such as authentication, concurrency control, caching bypass, and more.
 - Option to append random timestamps to URLs to bypass caching mechanisms
 - Redirect handling with security precautions
 - Filtering and reporting slow URLs based on a threshold
-- Save downloaded documents for further inspection
+- Save downloaded documents for further inspection or use as a static site mirror.
 
 ## Installation
 
@@ -83,7 +84,7 @@ Options:
 
 ### Example Usage
 
-####  
+####       
 
 ```sh
 # Fetch and analyze a sitemap with default settings

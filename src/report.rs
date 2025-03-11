@@ -1,9 +1,11 @@
-use crate::metrics::{Entry, Metrics};
+use crate::metrics::{CLEAN_FORMAT, Entry, Metrics};
 use crate::options::Cli;
+use crate::utils;
 use console::style;
 use csv::Writer;
+use prettytable::{Cell, Row, Table};
 use reqwest::StatusCode;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::error::Error;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -24,33 +26,101 @@ pub struct Report {
     pub responses: VecDeque<Response>,
 }
 
+#[derive(Debug)]
+pub struct Statistics {
+    pub response_time: Metrics,
+    pub status_code: Metrics,
+    pub performance: Metrics,
+}
+
 impl Report {
     pub fn show_text_report(&self, options: &Cli) {
-        println!("\n\n{}", self.statistics_metrics().build_table());
-        println!("{}", self.response_time_metrics().unwrap().build_table());
+        let stats = self.generate_statistics(options.slow_threshold);
+        let base_metrics = Metrics(vec![
+            Entry {
+                label: "Concurrency Limit",
+                value: self.concurrency_limit.to_string(),
+            },
+            Entry {
+                label: "Elapsed Time",
+                value: format!("{:.2?}", self.total_time),
+            },
+            Entry {
+                label: "Bypass Caching",
+                value: if options.append_timestamp {
+                    "Yes".to_string()
+                } else {
+                    "No".to_string()
+                },
+            },
+        ]);
 
-        for r in self.error_responses() {
-            println!(
-                "{}: {} ({}ms)",
-                style(r.status_code).bold(),
-                r.url,
-                r.response_time.as_millis()
-            );
+        println!(
+            "\n\n{} {}\n",
+            style("Statistics for").bold(),
+            style(&self.sitemap_url).bold().underlined()
+        );
+
+        let mut table = Table::new();
+        table.set_format(*CLEAN_FORMAT);
+        table.add_row(Row::new(vec![
+            Cell::new(base_metrics.build_table().as_str()),
+            Cell::new(stats.status_code.build_table().as_str()),
+        ]));
+        println!("{}", table);
+
+        println!(
+            "{}\n",
+            style("Response Time and Performance Statistics:").bold()
+        );
+
+        let mut table = Table::new();
+        table.set_format(*CLEAN_FORMAT);
+        table.add_row(Row::new(vec![
+            Cell::new(stats.response_time.build_table().as_str()),
+            Cell::new(stats.performance.build_table().as_str()),
+        ]));
+        println!("{}", table);
+
+        // Error Response List
+        let error_responses = self.error_responses();
+        if !error_responses.is_empty() {
+            println!("{}", style("Error Responses:").bold().underlined());
+            for r in error_responses {
+                println!(
+                    "{}: {} ({}ms)",
+                    style(r.status_code).bold(),
+                    r.url,
+                    r.response_time.as_millis()
+                );
+            }
         }
 
-        for r in self.slowest_responses(options.slow_threshold, 10i32) {
+        // Slow Response List
+        let slow_responses = self.slowest_responses(options.slow_threshold, 10i32);
+        if !slow_responses.is_empty() {
             println!(
-                "{}: {} ({}ms)",
-                style(r.status_code).bold(),
-                r.url,
-                r.response_time.as_millis()
+                "{} {}\n",
+                style("Slow Responses:").bold(),
+                style(format!(">={}s", options.slow_threshold))
+                    .dim()
+                    .italic()
             );
+            for r in slow_responses {
+                println!(
+                    "{}: {} ({}ms)",
+                    style(r.status_code).bold(),
+                    r.url,
+                    r.response_time.as_millis()
+                );
+            }
+            let tip = style(
+                "💡 Tip: You can adjust the threshold for slow responses using the `-s` flag.",
+            )
+            .dim()
+            .italic();
+            println!("\n{}", tip);
         }
-        let tip =
-            style("💡 Tip: You can adjust the threshold for slow responses using the `-s` flag.")
-                .dim()
-                .italic();
-        println!("\n{}", tip);
     }
 
     /// Write a CSV report
@@ -80,145 +150,149 @@ impl Report {
 
     // === Statistics ==============================================================================
 
-    /// Returns a `Metrics` object containing statistical information about a `Report`.
-    ///
-    /// The metrics include the following fields:
-    /// - **Sitemap URL**: The URL of the sitemap being processed.
-    /// - **Concurrency Limit**: The maximum number of HTTP requests allowed to execute concurrently.
-    /// - **Elapsed Time**: The total duration of the processing, in seconds, formatted to two decimal places.
-    /// - **Total Requests**: The total number of HTTP responses recorded.
-    ///
-    /// This function aggregates these details into `Entry` objects, which are
-    /// stored in a `Metrics` collection, which can be used for reporting or debugging.
-    ///
-    /// # Returns
-    /// A `Metrics` object containing entries for the statistical information of the `Report`.
-    fn statistics_metrics(&self) -> Metrics {
-        Metrics(vec![
-            Entry {
-                label: "Sitemap URL",
-                value: self.sitemap_url.to_string(),
-            },
-            Entry {
-                label: "Concurrency Limit",
-                value: self.concurrency_limit.to_string(),
-            },
-            Entry {
-                label: "Elapsed Time",
-                value: format!("{:.2?}", self.total_time),
-            },
-            Entry {
-                label: "Total Requests",
-                value: self.responses.len().to_string(),
-            },
-        ])
-    }
+    fn generate_statistics(&self, slow_threshold: f64) -> Statistics {
+        let report = &self;
+        let total_requests = report.responses.len();
+        let total_time_secs = report.total_time.as_secs_f64();
 
-    /// Calculates and retrieves response time metrics for a collection of responses.
-    ///
-    /// This function processes the response times from the stored responses,
-    /// and returns a set of metrics encapsulated in a `Metrics` struct. The metrics include:
-    ///
-    /// - **Average Response Time**: The mean response time.
-    /// - **P99 Response Time**: The response time of the 99th percentile (fastest 99% of requests).
-    /// - **P95 Response Time**: The response time of the 95th percentile (fastest 95% of requests).
-    /// - **Minimum Response Time**: The fastest recorded response time.
-    /// - **Maximum Response Time**: The slowest recorded response time.
-    ///
-    /// The metrics are sorted and calculated using nanosecond precision, ensuring accuracy
-    /// while clamping values to fit within valid ranges for `u64`.
-    ///
-    /// # Returns
-    ///
-    /// - `Some(Metrics)` containing response time metrics as a vector of `LabeledValue`s
-    ///   if there are any recorded responses.
-    /// - `None` if the response collection is empty.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// if let Some(metrics) = report.get_response_time_metrics() {
-    ///     for metric in metrics.0 {
-    ///         println!("{}: {:?}", metric.label, metric.value);
-    ///     }
-    /// }
-    /// // Output:
-    /// // ⏱️ Average Response Time: 300ms
-    /// // 🚀 P99 Response Time: 400ms
-    /// // ⭐️ P95 Response Time: 400ms
-    /// // 🐅 Min Response Time: 200ms
-    /// // 🐌 Max Response Time: 400ms
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// This function does not return errors explicitly. It ensures safe calculations
-    /// and clamps values to avoid integer overflows.
-    fn response_time_metrics(&self) -> Option<Metrics> {
-        if self.responses.is_empty() {
-            return None;
+        let response_times: Vec<Duration> =
+            report.responses.iter().map(|r| r.response_time).collect();
+        let response_sizes: Vec<usize> = report.responses.iter().map(|r| r.response_size).collect();
+
+        let avg_response_time =
+            response_times.iter().map(|d| d.as_secs_f64()).sum::<f64>() / total_requests as f64;
+        let median_response_time = response_times.get(response_times.len() / 2).copied();
+        let min_response_time = response_times.iter().copied().min();
+        let max_response_time = response_times.iter().copied().max();
+        let p90_response_time = response_times
+            .get((response_times.len() as f64 * 0.90) as usize)
+            .copied();
+        let p95_response_time = response_times
+            .get((response_times.len() as f64 * 0.95) as usize)
+            .copied();
+        let p99_response_time = response_times
+            .get((response_times.len() as f64 * 0.99) as usize)
+            .copied();
+
+        let variance = response_times
+            .iter()
+            .map(|t| (t.as_secs_f64() - avg_response_time).powi(2))
+            .sum::<f64>()
+            / total_requests as f64;
+        let std_dev = variance.sqrt();
+
+        let mut status_counts: HashMap<StatusCode, usize> = HashMap::new();
+        let mut success_count = 0;
+        let mut error_count = 0;
+        let mut redirect_count = 0;
+        let mut slow_count = 0;
+
+        for response in &report.responses {
+            *status_counts.entry(response.status_code).or_insert(0) += 1;
+            if response.status_code.is_success() {
+                success_count += 1;
+            } else if response.status_code.is_client_error()
+                || response.status_code.is_server_error()
+            {
+                error_count += 1;
+            } else if response.status_code.is_redirection() {
+                redirect_count += 1;
+            }
+
+            if response.response_time.as_secs_f64() > slow_threshold {
+                slow_count += 1;
+            }
         }
 
-        let mut response_times: Vec<u128> = self
-            .responses
-            .iter()
-            .map(|r| r.response_time.as_nanos())
-            .collect();
+        let success_rate = (success_count as f64 / total_requests as f64) * 100.0;
+        let error_rate = (error_count as f64 / total_requests as f64) * 100.0;
+        let redirect_rate = (redirect_count as f64 / total_requests as f64) * 100.0;
+        let slow_request_percentage = (slow_count as f64 / total_requests as f64) * 100.0;
 
-        response_times.sort_unstable(); // Sort in ascending order (fastest to slowest)
+        let avg_response_size = response_sizes.iter().sum::<usize>() / total_requests;
+        let min_response_size = response_sizes.iter().copied().min();
+        let max_response_size = response_sizes.iter().copied().max();
 
-        let fastest: u64 = response_times
-            .iter()
-            .min()
-            .map(|&time| time.clamp(0, u64::MAX as u128) as u64) // Ensure the value is in range
-            .unwrap_or_default(); // Default to 0 if iterator is empty
-
-        let slowest: u64 = response_times
-            .iter()
-            .max()
-            .map(|&time| time.clamp(0, u64::MAX as u128) as u64) // Ensure the value is in range
-            .unwrap_or_default(); // Default to 0 if iterator is empty
-
-        let total_nanos: u128 = response_times.iter().sum();
-        let avg_nanos = (total_nanos as f64 / response_times.len() as f64).round() as u64;
-
-        // Calculate the indices for P99 and P95
-        let p99_index =
-            ((response_times.len() as f64 * 0.99).floor() as usize).min(response_times.len() - 1);
-        let p95_index =
-            ((response_times.len() as f64 * 0.95).floor() as usize).min(response_times.len() - 1);
-
-        let p99_fastest_nanos = response_times[p99_index] as u64;
-        let p95_fastest_nanos = response_times[p95_index] as u64;
-
-        fn format_duration(d: Duration) -> String {
-            let secs = d.as_secs();
-            let millis = d.subsec_millis();
-            format!("{}.{:03}s", secs, millis)
+        Statistics {
+            response_time: Metrics(vec![
+                Entry {
+                    label: "⏱️ Average Response Time",
+                    value: utils::ms(Duration::from_secs_f64(avg_response_time)),
+                },
+                Entry {
+                    label: "🔷 Median Response Time",
+                    value: utils::ms(median_response_time.unwrap_or_default()),
+                },
+                Entry {
+                    label: "🐇 Min Response Time",
+                    value: utils::ms(min_response_time.unwrap_or_default()),
+                },
+                Entry {
+                    label: "🐌 Max Response Time",
+                    value: utils::ms(max_response_time.unwrap_or_default()),
+                },
+                Entry {
+                    label: "⚖️ P90 Response Time",
+                    value: utils::ms(p90_response_time.unwrap_or_default()),
+                },
+                Entry {
+                    label: "🎯 P95 Response Time",
+                    value: utils::ms(p95_response_time.unwrap_or_default()),
+                },
+                Entry {
+                    label: "🚀 P99 Response Time",
+                    value: utils::ms(p99_response_time.unwrap_or_default()),
+                },
+                Entry {
+                    label: "📉 Standard Deviation",
+                    value: utils::ms(Duration::from_secs_f64(std_dev)),
+                },
+            ]),
+            status_code: Metrics(vec![
+                Entry {
+                    label: "✅ Success Rate",
+                    value: format!("{success_rate}%"),
+                },
+                Entry {
+                    label: "🚨 Error Rate",
+                    value: format!("{error_rate}%"),
+                },
+                Entry {
+                    label: "🔄 Redirect Rate",
+                    value: format!("{redirect_rate}%"),
+                },
+            ]),
+            performance: Metrics(vec![
+                Entry {
+                    label: "⚡️ Total Requests Processed",
+                    value: total_requests.to_string(),
+                },
+                Entry {
+                    label: "⏳ Requests Per Second (RPS)",
+                    value: if total_time_secs > 0.0 {
+                        format!("{:.02} / sec", total_requests as f64 / total_time_secs)
+                    } else {
+                        "0 / sec".to_string()
+                    },
+                },
+                Entry {
+                    label: "📉 Slow Request Percentage",
+                    value: utils::percent(slow_request_percentage),
+                },
+                Entry {
+                    label: "📦 Average Response Size",
+                    value: utils::kb(avg_response_size),
+                },
+                Entry {
+                    label: "🔹 Min Response Size",
+                    value: utils::kb(min_response_size.unwrap_or_default()),
+                },
+                Entry {
+                    label: "🔺 Max Response Size",
+                    value: utils::kb(max_response_size.unwrap_or_default()),
+                },
+            ]),
         }
-
-        Some(Metrics(vec![
-            Entry {
-                label: "⏱️ Average Response Time",
-                value: format_duration(Duration::from_nanos(avg_nanos)),
-            },
-            Entry {
-                label: "🚀 P99 Response Time",
-                value: format_duration(Duration::from_nanos(p99_fastest_nanos)),
-            },
-            Entry {
-                label: "⭐️ P95 Response Time",
-                value: format_duration(Duration::from_nanos(p95_fastest_nanos)),
-            },
-            Entry {
-                label: "🐅 Min Response Time",
-                value: format_duration(Duration::from_nanos(fastest)),
-            },
-            Entry {
-                label: "🐌 Max Response Time",
-                value: format_duration(Duration::from_nanos(slowest)),
-            },
-        ]))
     }
 
     /// Filters and retrieves the slowest HTTP responses from the report.
@@ -244,7 +318,7 @@ impl Report {
         let mut responses: Vec<_> = self
             .responses
             .iter()
-            .filter(|r| r.response_time.as_secs_f64() > threshold)
+            .filter(|r| r.response_time.as_secs_f64() >= threshold)
             .cloned()
             .collect();
         responses.sort_unstable_by(|a, b| b.response_time.cmp(&a.response_time));

@@ -60,6 +60,9 @@ static TABLE_FORMAT: Lazy<TableFormat> = Lazy::new(|| {
         .build()
 });
 
+pub static CLEAN_FORMAT: Lazy<TableFormat> =
+    Lazy::new(|| FormatBuilder::new().padding(0, 3).build());
+
 #[derive(Debug)]
 pub struct Entry {
     pub label: &'static str,
