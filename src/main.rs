@@ -13,7 +13,6 @@ use std::sync::Arc;
 use crate::sitemap::{fetch_and_generate_report, get_sitemap_urls};
 use clap::Parser;
 use console::style;
-use tokio::sync::Semaphore;
 use tokio::time::Instant;
 
 #[tokio::main]
@@ -23,7 +22,6 @@ async fn main() -> Result<ExitCode, Box<dyn Error>> {
 
     // Build the HTTP client.
     let client = Arc::new(network::build_client(&options)?);
-    let semaphore = Arc::new(Semaphore::new(options.concurrency_limit as usize));
     let start_time = Instant::now();
 
     // Fetch all URLs from the sitemap.
@@ -35,7 +33,7 @@ async fn main() -> Result<ExitCode, Box<dyn Error>> {
         })?;
 
     // Fetch URLs concurrently and generate a report.
-    let report = fetch_and_generate_report(urls, client, semaphore, &options, start_time).await?;
+    let report = fetch_and_generate_report(urls, client, &options, start_time).await?;
 
     // Display the report.
     report.show_text_report(&options);

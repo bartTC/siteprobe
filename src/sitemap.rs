@@ -150,11 +150,11 @@ pub fn extract_sitemap_urls(xml: &str) -> Vec<String> {
 pub async fn fetch_and_generate_report(
     urls: Vec<String>,
     client: Arc<Client>,
-    semaphore: Arc<Semaphore>,
     options: &Cli,
     start_time: Instant,
 ) -> Result<Report, Box<dyn Error>> {
     // Setup progress bars.
+    let semaphore = Arc::new(Semaphore::new(options.concurrency_limit as usize));
     let wrapper_pb = indicatif::MultiProgress::new();
     let loading_pb = wrapper_pb.add(indicatif::ProgressBar::new(urls.len() as u64));
     loading_pb.set_style(
