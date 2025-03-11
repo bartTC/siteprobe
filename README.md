@@ -46,8 +46,7 @@ siteprobe <sitemap_url> [OPTIONS]
 
 ### Options
 
-```bash 
-$ siteprobe --help
+```
 Usage: siteprobe [OPTIONS] <SITEMAP_URL>
 
 Arguments:
@@ -68,7 +67,7 @@ Options:
           Default timeout (in seconds) for each request [default: 10]
       --user-agent <USER_AGENT>
           Custom User-Agent header to be used in requests 
-          [default: "Mozilla/5.0 (compatible; fetch-sitemap/0.1.0)"]
+          [default: "Mozilla/5.0 (compatible; Siteprobe/x.y.z)"]
       --slow-num <SLOW_NUM>
           Limit the number of slow documents displayed in the report [default: No limit]
   -s, --slow-threshold <SLOW_THRESHOLD>
@@ -84,27 +83,15 @@ Options:
 
 ### Example Usage
 
-#### Fetch and analyze a sitemap with default settings
+####  
 
 ```sh
+# Fetch and analyze a sitemap with default settings
 siteprobe https://example.com/sitemap.xml
+
+# Save the report to a specific file
+siteprobe https://example.com/sitemap.xml --report-path ./results/report.csv --putput-dir ./example.com
+
+# Set concurrency limit to 10 and timeout to 5 seconds
+siteprobe https://example.com/sitemap.xml --concurrency-limit 10 --request-timeout 5
 ```
-
-#### Set concurrency limit to 50 and timeout to 5 seconds
-
-```sh
-siteprobe https://example.com/sitemap.xml --concurrency-limit 50 --request-timeout 5
-```
-
-#### Save the report to a specific file
-
-```sh
-siteprobe https://example.com/sitemap.xml --report-path ./results/report.csv
-```
-
-#### Append timestamps to bypass cache and follow redirects
-
-```sh
-siteprobe https://example.com/sitemap.xml --append-timestamp --follow-redirects
-```
-

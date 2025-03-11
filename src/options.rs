@@ -14,7 +14,7 @@ pub mod defaults {
 
     /// The default user agent header value used for network requests.
     pub const USER_AGENT: &str = concat!(
-        "Mozilla/5.0 (compatible; fetch-sitemap/",
+        "Mozilla/5.0 (compatible; Siteprobe/",
         env!("CARGO_PKG_VERSION"),
         ")"
     );
