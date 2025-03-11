@@ -4,6 +4,8 @@ Siteprobe is a Rust-based CLI tool that fetches all URLs from a given `sitemap.x
 url, checks their existence, and generates a performance report. It supports various
 features such as authentication, concurrency control, caching bypass, and more.
 
+![Screenshot of Siteprobe statistics](https://github.com/bartTC/siteprobe/blob/main/docs/screenshot.png?raw=true)
+
 ## Features
 
 - Fetch and parse sitemap.xml to extract URLs, including nested Sitemap Index files
@@ -84,7 +86,7 @@ Options:
 
 ### Example Usage
 
-####       
+####        
 
 ```sh
 # Fetch and analyze a sitemap with default settings
