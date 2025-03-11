@@ -1,0 +1,23 @@
+[package]
+name = "siteprobe"
+version = "0.1.0"
+edition = "2024"
+authors = ["Martin Mahner <martin@elephant.house>"]
+description = "Fetch sitemap urls."
+
+[dependencies]
+base64 = "0.22.1"
+clap = { version = "4.5.31", features = ["derive"] }
+console = "0.15.11"
+futures = "0.3.31"
+indicatif = "0.17.11"
+once_cell = "1.20.3"
+prettytable = "0.10.0"
+quick-xml = "0.37.2"
+rand = "0.9.0"
+reqwest = { version = "0.12.12", features = ["json"] }
+tokio = { version = "1.43.0", features = ["full"] }
+unicode-segmentation = "1.12.0"
+url = "2.5.4"
+csv = "1.3.1"
+
