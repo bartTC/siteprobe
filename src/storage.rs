@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path;
 
 /// Stores the HTTP response body on disk as an HTML file.
 ///
@@ -20,7 +20,7 @@ use std::path::PathBuf;
 /// # Panics
 ///
 /// This function will panic if it fails to write the file to the specified path.
-pub async fn store_response_on_disk(storage_path: &PathBuf, url: &url::Url, body: &str) {
+pub async fn store_response_on_disk(storage_path: &path::Path, url: &url::Url, body: &str) {
     let document_path = format!(
         "{}.html",
         if url.path().trim_matches('/').is_empty() {
