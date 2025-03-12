@@ -29,7 +29,7 @@ async fn main() -> Result<ExitCode, Box<dyn Error>> {
         .await
         .map_err(|e| {
             eprintln!("{} Unable to fetch sitemap: {}", style("[ERROR]").red(), e);
-            e
+            std::process::exit(1);
         })?;
 
     // Fetch URLs concurrently and generate a report.
