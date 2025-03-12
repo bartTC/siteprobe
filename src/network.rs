@@ -17,6 +17,7 @@ use std::time::Duration;
 /// A `Result` containing the built `Client` if successful, or an error otherwise.
 pub fn build_client(options: &Cli) -> Result<reqwest::Client, Box<dyn Error>> {
     let mut client_builder = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
         .user_agent(options.user_agent.as_str())
         .timeout(Duration::from_secs(options.request_timeout as u64));
 
