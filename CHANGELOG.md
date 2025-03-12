@@ -2,8 +2,10 @@
 
 ## WIP
 
-- List of 'slow responses' is now optional and only shown if `--slow-threshold` is set.
-- Progress bar displays remaining time.
+- The 'slow responses' list is now optional and will only be displayed if the
+  `--slow-threshold` option is specified.
+- The progress bar now shows the estimated remaining time.
+- Fixed an issue where the follow redirect option was not functioning as expected.
 
 ## v0.1.0 (2025-03-11)
 
