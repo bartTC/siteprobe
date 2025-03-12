@@ -18,9 +18,6 @@ pub mod defaults {
         env!("CARGO_PKG_VERSION"),
         ")"
     );
-
-    /// The threshold in seconds beyond which a network request is considered "slow".
-    pub const SLOW_THRESHOLD: f64 = 3.0;
 }
 
 fn validate_output_dir_str(s: &str) -> Result<PathBuf, String> {
@@ -40,6 +37,19 @@ fn validate_output_dir_str(s: &str) -> Result<PathBuf, String> {
         fs::create_dir_all(&path).map_err(|e| format!("Failed to create directory: {}", e))?;
         Ok(path)
     }
+}
+
+fn parse_slow_threshold(value: &str) -> Result<f64, String> {
+    let parsed: f64 = value
+        .parse()
+        .map_err(|_| format!("'{}' is not a valid number.", value))?;
+    if parsed < 0.0 {
+        return Err(format!(
+            "Value '{}' must be greater than or equal to 0.0.",
+            value
+        ));
+    }
+    Ok(parsed)
 }
 
 #[derive(Debug, Parser)]
@@ -111,18 +121,12 @@ pub struct Cli {
     pub user_agent: String,
 
     #[arg(
-        long,
-        help = "Limit the number of slow documents displayed in the report [default: No limit]"
-    )]
-    pub slow_num: Option<i32>,
-
-    #[arg(
         short = 's',
         long,
-        help = "Threshold (in seconds) for considering a document as 'slow'.",
-        default_value_t = defaults::SLOW_THRESHOLD,
+        help = "Show slow responses. The value is the threshold (in seconds) for considering a document as 'slow'. E.g. '-s 3' for 3 seconds or '-s 0.05' for 50ms.",
+        value_parser = parse_slow_threshold,
     )]
-    pub slow_threshold: f64,
+    pub slow_threshold: Option<f64>,
 
     #[arg(
         short = 'f',

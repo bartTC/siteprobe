@@ -97,29 +97,29 @@ impl Report {
         }
 
         // Slow Response List
-        let slow_responses = self.slowest_responses(options.slow_threshold, 10i32);
-        if !slow_responses.is_empty() {
-            println!(
-                "{} {}\n",
-                style("Slow Responses:").bold(),
-                style(format!(">={}s", options.slow_threshold))
-                    .dim()
-                    .italic()
-            );
-            for r in slow_responses {
+        if let Some(threshold) = options.slow_threshold {
+            let slow_responses = self.slowest_responses(threshold, 10i32);
+            if !slow_responses.is_empty() {
                 println!(
-                    "{}: {} ({}ms)",
-                    style(r.status_code).bold(),
-                    r.url,
-                    r.response_time.as_millis()
+                    "{} {}\n",
+                    style("Slow Responses:").bold(),
+                    style(format!(">={}s", threshold)).dim().italic()
                 );
+                for r in slow_responses {
+                    println!(
+                        "{}: {} ({}ms)",
+                        style(r.status_code).bold(),
+                        r.url,
+                        r.response_time.as_millis()
+                    );
+                }
+                let tip = style(
+                    "💡 Tip: You can adjust the threshold for slow responses using the `-s` flag.",
+                )
+                .dim()
+                .italic();
+                println!("\n{}", tip);
             }
-            let tip = style(
-                "💡 Tip: You can adjust the threshold for slow responses using the `-s` flag.",
-            )
-            .dim()
-            .italic();
-            println!("\n{}", tip);
         }
     }
 
@@ -150,7 +150,7 @@ impl Report {
 
     // === Statistics ==============================================================================
 
-    fn generate_statistics(&self, slow_threshold: f64) -> Statistics {
+    fn generate_statistics(&self, slow_threshold: Option<f64>) -> Statistics {
         let report = &self;
         let total_requests = report.responses.len();
         let total_time_secs = report.total_time.as_secs_f64();
@@ -199,8 +199,10 @@ impl Report {
                 redirect_count += 1;
             }
 
-            if response.response_time.as_secs_f64() > slow_threshold {
-                slow_count += 1;
+            if let Some(threshold) = slow_threshold {
+                if response.response_time.as_secs_f64() > threshold {
+                    slow_count += 1;
+                }
             }
         }
 
@@ -277,7 +279,11 @@ impl Report {
                 },
                 Entry {
                     label: "📉 Slow Request Percentage",
-                    value: utils::percent(slow_request_percentage),
+                    value: if slow_threshold.is_some() {
+                        utils::percent(slow_request_percentage)
+                    } else {
+                        "Not Set".to_string()
+                    },
                 },
                 Entry {
                     label: "📦 Average Response Size",
