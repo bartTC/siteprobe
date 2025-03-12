@@ -161,7 +161,7 @@ pub async fn fetch_and_generate_report(
         indicatif::ProgressStyle::default_bar()
             .template(concat!(
                 "\x1b[2m[3/3]\x1b[0m",
-                " 📥 [{elapsed_precise}] [{bar:40.cyan/blue}] Loading URL {pos}/{len} {msg}"
+                " 📥 [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} (ETA: {eta_precise}) {msg}"
             ))
             .unwrap()
             .progress_chars("■┄"),
