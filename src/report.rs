@@ -85,15 +85,20 @@ impl Report {
         // Error Response List
         let error_responses = self.error_responses();
         if !error_responses.is_empty() {
-            println!("{}", style("Error Responses:").bold().underlined());
+            println!("{}\n", style("Error Responses:").bold());
             for r in error_responses {
                 println!(
-                    "{}: {} ({}ms)",
-                    style(r.status_code).bold(),
+                    "{} {} {}",
+                    if r.status_code.is_server_error() {
+                        style(format!("{}:", r.status_code)).bold().white().on_red()
+                    } else {
+                        style(format!("{}:", r.status_code)).bold().dim()
+                    },
                     r.url,
-                    r.response_time.as_millis()
+                    style(format!("{}ms", r.response_time.as_millis())).dim()
                 );
             }
+            println!(); // Blank line before slow responses
         }
 
         // Slow Response List
@@ -107,10 +112,10 @@ impl Report {
                 );
                 for r in slow_responses {
                     println!(
-                        "{}: {} ({}ms)",
-                        style(r.status_code).bold(),
+                        "{} {} {}",
+                        style(format!("{}:", r.status_code)).bold().dim(),
                         r.url,
-                        r.response_time.as_millis()
+                        style(format!("{}ms", r.response_time.as_millis())).dim()
                     );
                 }
             }
