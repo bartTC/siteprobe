@@ -1,6 +1,6 @@
 # Changelog
 
-## WIP
+## v0.2.0 (2025-03-12)
 
 - The 'slow responses' list is now optional and will only be displayed if the
   `--slow-threshold` option is specified.
