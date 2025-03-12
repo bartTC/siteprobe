@@ -247,15 +247,15 @@ impl Report {
             status_code: Metrics(vec![
                 Entry {
                     label: "✅ Success Rate",
-                    value: format!("{success_rate}%"),
+                    value: utils::percent(success_rate),
                 },
                 Entry {
                     label: "🚨 Error Rate",
-                    value: format!("{error_rate}%"),
+                    value: utils::percent(error_rate),
                 },
                 Entry {
                     label: "🔄 Redirect Rate",
-                    value: format!("{redirect_rate}%"),
+                    value: utils::percent(redirect_rate),
                 },
             ]),
             performance: Metrics(vec![
