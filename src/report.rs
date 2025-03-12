@@ -98,7 +98,7 @@ impl Report {
 
         // Slow Response List
         if let Some(threshold) = options.slow_threshold {
-            let slow_responses = self.slowest_responses(threshold, 10i32);
+            let slow_responses = self.slowest_responses(threshold, options.slow_num);
             if !slow_responses.is_empty() {
                 println!(
                     "{} {}\n",
@@ -113,12 +113,6 @@ impl Report {
                         r.response_time.as_millis()
                     );
                 }
-                let tip = style(
-                    "💡 Tip: You can adjust the threshold for slow responses using the `-s` flag.",
-                )
-                .dim()
-                .italic();
-                println!("\n{}", tip);
             }
         }
     }
@@ -320,7 +314,7 @@ impl Report {
     /// A `Vec<Response>` containing at most `limit` responses sorted by `response_time`
     /// in descending order. Each response in the vector has a `response_time` greater
     /// than the given threshold.
-    fn slowest_responses(&self, threshold: f64, limit: i32) -> Vec<Response> {
+    fn slowest_responses(&self, threshold: f64, limit: u32) -> Vec<Response> {
         let mut responses: Vec<_> = self
             .responses
             .iter()

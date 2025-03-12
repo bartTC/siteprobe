@@ -18,6 +18,9 @@ pub mod defaults {
         env!("CARGO_PKG_VERSION"),
         ")"
     );
+
+    /// The maximum number of slow documents to show
+    pub const SLOW_NUM: i32 = 100;
 }
 
 fn validate_output_dir_str(s: &str) -> Result<PathBuf, String> {
@@ -119,6 +122,14 @@ pub struct Cli {
         default_value_t = defaults::USER_AGENT.to_string(),
     )]
     pub user_agent: String,
+
+    #[arg(
+        long,
+        help = "Limit the number of slow documents displayed in the report.",
+        default_value_t = defaults::SLOW_NUM as u32,
+        value_parser = clap::value_parser!(u32).range(1..)
+    )]
+    pub slow_num: u32,
 
     #[arg(
         short = 's',
