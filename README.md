@@ -93,7 +93,7 @@ Options:
 siteprobe https://example.com/sitemap.xml
 
 # Save the report to a specific file
-siteprobe https://example.com/sitemap.xml --report-path ./results/report.csv --putput-dir ./example.com
+siteprobe https://example.com/sitemap.xml --report-path ./results/report.csv --output-dir ./example.com
 
 # Set concurrency limit to 10 and timeout to 5 seconds
 siteprobe https://example.com/sitemap.xml --concurrency-limit 10 --request-timeout 5
