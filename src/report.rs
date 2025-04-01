@@ -124,6 +124,11 @@ impl Report {
 
     /// Write a CSV report
     pub fn write_csv_report(&self, report_path: &PathBuf) -> Result<(), Box<dyn Error>> {
+        // If the report path parent is a director, create it if it doesn't exist yet
+        if let Some(parent) = report_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
         let mut writer = Writer::from_path(report_path)?;
         writer.write_record(vec![
             "URL",
