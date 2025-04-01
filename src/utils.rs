@@ -118,6 +118,20 @@ pub fn validate_basic_auth(val: &str) -> Result<String, String> {
     }
 }
 
+pub fn kb(bytes: usize) -> String {
+    let kilobytes = bytes as f64 / 1024.0;
+    format!("{kilobytes:.2}kb")
+}
+
+pub fn percent(percent: f64) -> String {
+    format!("{percent:.0}%")
+}
+
+pub fn ms(duration: Duration) -> String {
+    let milliseconds = duration.as_millis() as f64;
+    format!("{milliseconds:.2}ms")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235,18 +249,4 @@ mod tests {
         // Passing a length of zero should panic because `10u64.pow(length - 1)` will underflow
         generate_random_number(0);
     }
-}
-
-pub fn kb(bytes: usize) -> String {
-    let kilobytes = bytes as f64 / 1024.0;
-    format!("{kilobytes:.2}kb")
-}
-
-pub fn percent(percent: f64) -> String {
-    format!("{percent:.0}%")
-}
-
-pub fn ms(duration: Duration) -> String {
-    let milliseconds = duration.as_millis() as f64;
-    format!("{milliseconds:.2}ms")
 }

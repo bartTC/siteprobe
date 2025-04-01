@@ -24,6 +24,7 @@ pub mod defaults {
 }
 
 fn validate_output_dir_str(s: &str) -> Result<PathBuf, String> {
+    
     let path = PathBuf::from(s);
     if path.exists() && path.is_dir() {
         println!(

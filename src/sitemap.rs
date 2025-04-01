@@ -149,9 +149,9 @@ pub fn extract_sitemap_urls(xml: &str) -> Vec<String> {
 /// A `Result` containing a fully populated `Report` if successful, or an error otherwise.
 pub async fn fetch_and_generate_report(
     urls: Vec<String>,
-    client: Arc<Client>,
+    client: &Arc<Client>,
     options: &Cli,
-    start_time: Instant,
+    start_time: &Instant,
 ) -> Result<Report, Box<dyn Error>> {
     // Setup progress bars.
     let semaphore = Arc::new(Semaphore::new(options.concurrency_limit as usize));

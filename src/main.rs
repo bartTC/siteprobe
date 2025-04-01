@@ -33,7 +33,7 @@ async fn main() -> Result<ExitCode, Box<dyn Error>> {
         })?;
 
     // Fetch URLs concurrently and generate a report.
-    let report = fetch_and_generate_report(urls, client, &options, start_time).await?;
+    let report = fetch_and_generate_report(urls, &client, &options, &start_time).await?;
 
     // Display the report.
     report.show_text_report(&options);
