@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.0 (2025-04-27)
+
+- Introduced the `--report-path-json` option to generate a detailed request and
+  performance report in JSON format.
+
 ## v0.2.0 (2025-03-12)
 
 - The 'slow responses' list is now optional and will only be displayed if the
