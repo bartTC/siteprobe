@@ -91,8 +91,6 @@ Options:
 
 ### Example Usage
 
-####         
-
 ```sh
 # Fetch and analyze a sitemap with default settings
 siteprobe https://example.com/sitemap.xml
