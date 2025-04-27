@@ -13,7 +13,7 @@ use std::path;
 /// # Arguments
 ///
 /// * `storage_path` - A reference to the target directory where the response will be stored.
-///                    This should be passed as an `&Path` (not `&PathBuf` for efficiency).
+///   This should be passed as an `&Path` (not `&PathBuf` for efficiency).
 /// * `url` - A reference to the URL object representing the source of the response.
 /// * `body` - The response body content that will be written to the file.
 ///

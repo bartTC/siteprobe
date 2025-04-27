@@ -170,7 +170,7 @@ pub async fn fetch_and_generate_report(
     // Limit to a subset of URLs for demonstration purposes.
     let fetches = urls.iter().map(|u| {
         let semaphore = Arc::clone(&semaphore);
-        let client = Arc::clone(&client);
+        let client = Arc::clone(client);
         let output_dir = options.output_dir.clone();
         let mut url = u.clone();
 
