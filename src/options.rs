@@ -24,7 +24,6 @@ pub mod defaults {
 }
 
 fn validate_output_dir_str(s: &str) -> Result<PathBuf, String> {
-    
     let path = PathBuf::from(s);
     if path.exists() && path.is_dir() {
         println!(
@@ -107,6 +106,15 @@ pub struct Cli {
         value_parser = clap::value_parser!(PathBuf)
     )]
     pub report_path: Option<PathBuf>,
+
+    #[arg(
+        short = 'j',
+        long,
+        help = "File path for storing the generated `report.json`",
+        value_hint = ValueHint::FilePath,
+        value_parser = clap::value_parser!(PathBuf)
+    )]
+    pub report_path_json: Option<PathBuf>,
 
     #[arg(
         short = 't',

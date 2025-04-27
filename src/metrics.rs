@@ -1,6 +1,9 @@
 use once_cell::sync::Lazy;
 use prettytable::format::{FormatBuilder, LinePosition, LineSeparator, TableFormat};
 use prettytable::{Cell, Row, Table};
+use serde::{Serialize, Serializer};
+use serde_json::Value;
+use std::collections::HashMap;
 
 /// # Table Visualization Utility
 ///
@@ -63,10 +66,12 @@ static TABLE_FORMAT: Lazy<TableFormat> = Lazy::new(|| {
 pub static CLEAN_FORMAT: Lazy<TableFormat> =
     Lazy::new(|| FormatBuilder::new().padding(0, 3).build());
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Entry {
     pub label: &'static str,
     pub value: String,
+    pub json_label: &'static str,
+    pub json_value: Value,
 }
 
 #[derive(Debug)]
@@ -83,5 +88,20 @@ impl Metrics {
             ]));
         }
         table.to_string()
+    }
+}
+
+impl Serialize for Metrics {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // Convert Metrics entries into a simple HashMap with {jsonLabel: value}
+        let map: HashMap<_, _> = self
+            .0
+            .iter()
+            .map(|entry| (entry.json_label, entry.json_value.clone()))
+            .collect();
+        map.serialize(serializer)
     }
 }

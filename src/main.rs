@@ -38,9 +38,14 @@ async fn main() -> Result<ExitCode, Box<dyn Error>> {
     // Display the report.
     report.show_text_report(&options);
 
-    // Optionally, write report to CSV file.
+    // Optionally, write the report to CSV file.
     if let Some(path) = options.report_path.as_ref() {
         report.write_csv_report(path)?;
+    }
+
+    // Optionally, write the report to JSON file.
+    if let Some(path) = options.report_path_json.as_ref() {
+        report.write_json_report(&options, path)?;
     }
 
     Ok(ExitCode::SUCCESS)

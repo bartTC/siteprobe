@@ -5,8 +5,11 @@ use console::style;
 use csv::Writer;
 use prettytable::{Cell, Row, Table};
 use reqwest::StatusCode;
+use serde_json::json;
 use std::collections::{HashMap, VecDeque};
 use std::error::Error;
+use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -40,10 +43,14 @@ impl Report {
             Entry {
                 label: "Concurrency Limit",
                 value: self.concurrency_limit.to_string(),
+                json_label: "concurrencyLimit",
+                json_value: json!(self.concurrency_limit),
             },
             Entry {
                 label: "Elapsed Time",
                 value: format!("{:.2?}", self.total_time),
+                json_label: "elapsedTimeMs",
+                json_value: json!(self.total_time.as_millis()),
             },
             Entry {
                 label: "Bypass Caching",
@@ -52,6 +59,8 @@ impl Report {
                 } else {
                     "No".to_string()
                 },
+                json_label: "bypassCaching",
+                json_value: json!(options.append_timestamp),
             },
         ]);
 
@@ -120,6 +129,54 @@ impl Report {
                 }
             }
         }
+    }
+
+    pub fn write_json_report(
+        &self,
+        options: &Cli,
+        report_path: &PathBuf,
+    ) -> Result<(), Box<dyn Error>> {
+        // If the report path parent is a director, create it if it doesn't exist yet
+        if let Some(parent) = report_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let statistics = self.generate_statistics(options.slow_threshold);
+
+        let json_data = json!(
+            {
+               "config": {
+                    "sitemapUrl": self.sitemap_url,
+                    "concurrencyLimit": self.concurrency_limit,
+                    "elapsedTime": self.total_time.as_millis(),
+                    "bypassCaching": options.append_timestamp,
+                },
+                "statistics": {
+                    "performance": statistics.performance,
+                    "responseTime": statistics.response_time,
+                    "statusCode": statistics.status_code,
+                },
+                "responses" : self.responses.iter().map(|r| {
+                    json!({
+                        "url": r.url,
+                        "responseTime": r.response_time.as_millis(),
+                        "responseSize": r.response_size,
+                        "statusCode": r.status_code.as_u16(),
+                    })
+                }).collect::<Vec<serde_json::Value>>()
+            }
+        );
+
+        // Write the JSON to a file
+        let mut file = File::create(report_path)?;
+        file.write_all(serde_json::to_string_pretty(&json_data)?.as_bytes())?;
+
+        println!(
+            "\n📄 The JSON report was written to {}",
+            style(report_path.display()).underlined().cyan()
+        );
+
+        Ok(())
     }
 
     /// Write a CSV report
@@ -224,54 +281,78 @@ impl Report {
                 Entry {
                     label: "⏱️ Average Response Time",
                     value: utils::ms(Duration::from_secs_f64(avg_response_time)),
+                    json_label: "avgMs",
+                    json_value: json!(Duration::from_secs_f64(avg_response_time).as_millis()),
                 },
                 Entry {
                     label: "🔷 Median Response Time",
                     value: utils::ms(median_response_time.unwrap_or_default()),
+                    json_label: "medianMs",
+                    json_value: json!(median_response_time.unwrap_or_default().as_millis()),
                 },
                 Entry {
                     label: "🐇 Min Response Time",
                     value: utils::ms(min_response_time.unwrap_or_default()),
+                    json_label: "minMs",
+                    json_value: json!(min_response_time.unwrap_or_default().as_millis()),
                 },
                 Entry {
                     label: "🐌 Max Response Time",
                     value: utils::ms(max_response_time.unwrap_or_default()),
+                    json_label: "maxMs",
+                    json_value: json!(max_response_time.unwrap_or_default().as_millis()),
                 },
                 Entry {
                     label: "⚖️ P90 Response Time",
                     value: utils::ms(p90_response_time.unwrap_or_default()),
+                    json_label: "p90Ms",
+                    json_value: json!(p90_response_time.unwrap_or_default().as_millis()),
                 },
                 Entry {
                     label: "🎯 P95 Response Time",
                     value: utils::ms(p95_response_time.unwrap_or_default()),
+                    json_label: "p95Ms",
+                    json_value: json!(p95_response_time.unwrap_or_default().as_millis()),
                 },
                 Entry {
                     label: "🚀 P99 Response Time",
                     value: utils::ms(p99_response_time.unwrap_or_default()),
+                    json_label: "p99Ms",
+                    json_value: json!(p99_response_time.unwrap_or_default().as_millis()),
                 },
                 Entry {
                     label: "📉 Standard Deviation",
                     value: utils::ms(Duration::from_secs_f64(std_dev)),
+                    json_label: "stdDevMs",
+                    json_value: json!(Duration::from_secs_f64(std_dev).as_millis()),
                 },
             ]),
             status_code: Metrics(vec![
                 Entry {
                     label: "✅ Success Rate",
                     value: utils::percent(success_rate),
+                    json_label: "successRatePercentage",
+                    json_value: json!(success_rate),
                 },
                 Entry {
                     label: "🚨 Error Rate",
                     value: utils::percent(error_rate),
+                    json_label: "errorRatePercentage",
+                    json_value: json!(error_rate),
                 },
                 Entry {
                     label: "🔄 Redirect Rate",
                     value: utils::percent(redirect_rate),
+                    json_label: "redirectRatePercentage",
+                    json_value: json!(redirect_rate),
                 },
             ]),
             performance: Metrics(vec![
                 Entry {
                     label: "⚡️ Total Requests Processed",
                     value: total_requests.to_string(),
+                    json_label: "totalRequests",
+                    json_value: json!(total_requests),
                 },
                 Entry {
                     label: "⏳ Requests Per Second (RPS)",
@@ -280,6 +361,8 @@ impl Report {
                     } else {
                         "0 / sec".to_string()
                     },
+                    json_label: "requestsPerSecond",
+                    json_value: json!(total_requests as f64 / total_time_secs),
                 },
                 Entry {
                     label: "📉 Slow Request Percentage",
@@ -288,18 +371,26 @@ impl Report {
                     } else {
                         "Not Set".to_string()
                     },
+                    json_label: "slowRequestPercentage",
+                    json_value: json!(slow_request_percentage),
                 },
                 Entry {
                     label: "📦 Average Response Size",
                     value: utils::kb(avg_response_size),
+                    json_label: "avgResponseSizeBytes",
+                    json_value: json!(avg_response_size),
                 },
                 Entry {
                     label: "🔹 Min Response Size",
                     value: utils::kb(min_response_size.unwrap_or_default()),
+                    json_label: "minResponseSizeBytes",
+                    json_value: json!(min_response_size.unwrap_or_default()),
                 },
                 Entry {
                     label: "🔺 Max Response Size",
                     value: utils::kb(max_response_size.unwrap_or_default()),
+                    json_label: "maxResponseSizeBytes",
+                    json_value: json!(max_response_size.unwrap_or_default()),
                 },
             ]),
         }
