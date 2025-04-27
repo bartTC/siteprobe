@@ -66,27 +66,32 @@ Options:
           Append a random timestamp to each URL to bypass caching mechanisms
   -r, --report-path <REPORT_PATH>
           File path for storing the generated `report.csv`
+  -j, --report-path-json <REPORT_PATH_JSON>
+          File path for storing the generated `report.json`
   -t, --request-timeout <REQUEST_TIMEOUT>
           Default timeout (in seconds) for each request [default: 10]
       --user-agent <USER_AGENT>
-          Custom User-Agent header to be used in requests 
-          [default: "Mozilla/5.0 (compatible; Siteprobe/x.y.z)"]
+          Custom User-Agent header to be used in requests [default: "Mozilla/5.0
+          (compatible; Siteprobe/0.3.0)"]
       --slow-num <SLOW_NUM>
-          Limit the number of slow documents displayed in the report [default: No limit]
+          Limit the number of slow documents displayed in the report. [default:
+          100]
   -s, --slow-threshold <SLOW_THRESHOLD>
-          Threshold (in seconds) for considering a document as 'slow'. [default: 3]
+          Show slow responses. The value is the threshold (in seconds) for
+          considering a document as 'slow'. E.g. '-s 3' for 3 seconds or '-s
+          0.05' for 50ms.
   -f, --follow-redirects
-          Controls automatic redirects. When enabled, the client will follow HTTP 
-          redirects (up to 10 by default). Note that for security, Basic Authentication 
-          credentials are intentionally not forwarded during redirects to prevent 
-          unintended credential exposure.
+          Controls automatic redirects. When enabled, the client will follow
+          HTTP redirects (up to 10 by default). Note that for security, Basic
+          Authentication credentials are intentionally not forwarded during
+          redirects to prevent unintended credential exposure.
   -h, --help
           Print help
 ```
 
 ### Example Usage
 
-####        
+####         
 
 ```sh
 # Fetch and analyze a sitemap with default settings
