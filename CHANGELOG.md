@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.4.0 (2025-05-11)
+
+- An appropriate error message will be displayed for an invalid sitemap URL.
+
 ## v0.3.0 (2025-04-27)
 
 - Introduced the `--report-path-json` option to generate a detailed request and
