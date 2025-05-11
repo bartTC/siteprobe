@@ -46,11 +46,7 @@ pub async fn get_sitemap_urls(
     println!("{} 🔎 Fetch {}...", style("[1/3]").dim(), sitemap_type);
 
     if sitemap_type == SitemapType::Unknown {
-        eprintln!(
-            "{} The sitemap does not contain any urls: {}",
-            style("[ERROR]").red(),
-            &sitemap_url
-        );
+        return Err(format!("The sitemap does not contain any URLs: {}", sitemap_url).into());
     }
 
     // A sitemap.xml file might be an index file, linking to other sitemaps.
