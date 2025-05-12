@@ -28,7 +28,7 @@ async fn main() -> Result<ExitCode, Box<dyn Error>> {
     let urls = get_sitemap_urls(options.sitemap_url.as_str(), &client)
         .await
         .map_err(|e| {
-            eprintln!("{} Unable to fetch sitemap: {}", style("[ERROR]").red(), e);
+            eprintln!("{} {}", style("[ERROR]").red(), e);
             std::process::exit(1);
         })?;
 

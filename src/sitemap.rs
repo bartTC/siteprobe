@@ -38,7 +38,7 @@ pub async fn get_sitemap_urls(
     let content = match get_url_content(sitemap_url, client).await {
         Ok(content) => content,
         Err(e) => {
-            return Err(Box::new(e));
+            return Err(format!("Unable to fetch sitemap: {}", Box::new(e)).into());
         }
     };
 
