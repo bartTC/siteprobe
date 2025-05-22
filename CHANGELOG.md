@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Enhance the clarity of error messages.
+
 ## v0.4.0 (2025-05-11)
 
 - An appropriate error message will be displayed for an invalid sitemap URL.
