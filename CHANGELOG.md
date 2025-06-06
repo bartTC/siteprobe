@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.5.0
 
 - Enhance the clarity of error messages.
 - Introduced a new rate-limiting feature, allowing users to define the rate at which
