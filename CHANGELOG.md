@@ -3,6 +3,9 @@
 ## Unreleased
 
 - Enhance the clarity of error messages.
+- Introduced a new rate-limiting feature, allowing users to define the rate at which
+  sitemap URLs are fetched. E.g.: 60 requests per minute (`-l 60/1m`) or 300 requests
+  every 5 minutes (`-l 300/5m`).
 
 ## v0.4.0 (2025-05-11)
 

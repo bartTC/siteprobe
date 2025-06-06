@@ -4,11 +4,15 @@ use crate::report::Report;
 use crate::utils;
 use console::style;
 use futures::future::join_all;
+use governor::clock::DefaultClock;
+use governor::state::{InMemoryState, NotKeyed};
+use governor::{Quota, RateLimiter};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use reqwest::Client;
 use std::error::Error;
 use std::fmt;
+use std::num::NonZeroU32;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
@@ -20,6 +24,11 @@ pub enum SitemapType {
     SitemapIndex,
     UrlSet,
     Unknown,
+}
+
+pub struct RateLimitSetup {
+    pub limit: Option<u32>,
+    pub limiter: Option<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
 }
 
 // Implement Display for SitemapType
@@ -163,9 +172,20 @@ pub async fn fetch_and_generate_report(
             .progress_chars("■┄"),
     );
 
-    // Limit to a subset of URLs for demonstration purposes.
+    // Setup rate limiter for 100 requests per 5 minutes.
+    let rate_limit_setup = Arc::new(RateLimitSetup {
+        limit: options.rate_limit,
+        limiter: options.rate_limit.map(|rate_limit_value| {
+            RateLimiter::direct(
+                Quota::per_minute(NonZeroU32::new(rate_limit_value).unwrap())
+                    .allow_burst(NonZeroU32::new(1).unwrap()),
+            )
+        }),
+    });
+
     let fetches = urls.iter().map(|u| {
         let semaphore = Arc::clone(&semaphore);
+        let rate_limit_setup = Arc::clone(&rate_limit_setup);
         let client = Arc::clone(client);
         let output_dir = options.output_dir.clone();
         let mut url = u.clone();
@@ -181,6 +201,24 @@ pub async fn fetch_and_generate_report(
 
         tokio::spawn(async move {
             let _permit = semaphore.acquire().await.expect("Semaphore closed");
+
+            if rate_limit_setup.limit.is_some() && rate_limit_setup.limiter.is_some() {
+                // Set the progress bar message to indicate rate limiting
+                line_pb.set_message(format!(
+                    "Waiting for rate limit ({:?}/min): {}",
+                    rate_limit_setup.limit.unwrap(),
+                    &utils::truncate_message(&url, 80)
+                ));
+
+                // Wait until the rate limit is satisfied
+                rate_limit_setup
+                    .limiter
+                    .as_ref()
+                    .unwrap()
+                    .until_ready()
+                    .await;
+            }
+
             line_pb.set_message(format!("Fetching: {}", utils::truncate_message(&url, 80)));
             line_pb.enable_steady_tick(Duration::from_millis(100));
             let result = get_url_response(&url, &client, &output_dir).await;
@@ -197,6 +235,7 @@ pub async fn fetch_and_generate_report(
     let mut report = Report {
         sitemap_url: options.sitemap_url.to_string(),
         concurrency_limit: options.concurrency_limit,
+        rate_limit: options.rate_limit,
         total_time: start_time.elapsed(),
         responses: std::collections::VecDeque::new(),
     };

@@ -42,6 +42,52 @@ fn validate_output_dir_str(s: &str) -> Result<PathBuf, String> {
     }
 }
 
+#[derive(Debug)]
+enum TimeUnit {
+    Seconds,
+    Minutes,
+    Hours,
+}
+
+fn parse_rate_limit(value: &str) -> Result<u32, String> {
+    let parts: Vec<&str> = value.split('/').collect();
+    if parts.len() != 2 {
+        return Err("Rate limit must be in the format 'requests/time[unit]'".to_string());
+    }
+
+    let requests: u32 = parts[0].parse().map_err(|_| "Invalid request count")?;
+    let time_str = parts[1];
+
+    if time_str.is_empty() {
+        return Err("Time value cannot be empty".to_string());
+    }
+
+    let unit = match time_str.chars().last().unwrap() {
+        's' => TimeUnit::Seconds,
+        'm' => TimeUnit::Minutes,
+        'h' => TimeUnit::Hours,
+        _ => return Err("Time unit must be 's', 'm', or 'h'.".to_string()),
+    };
+
+    let time_value: u64 = time_str[..time_str.len() - 1]
+        .parse()
+        .map_err(|_| "Invalid time value")?;
+
+    if time_value == 0 {
+        return Err("Time value must be greater than 0".to_string());
+    }
+
+    let duration_secs = match unit {
+        TimeUnit::Seconds => time_value,
+        TimeUnit::Minutes => time_value * 60,
+        TimeUnit::Hours => time_value * 3600,
+    };
+
+    let requests_per_minute = ((requests as f64) * 60.0 / (duration_secs as f64)).floor() as u32;
+
+    Ok(requests_per_minute)
+}
+
 fn parse_slow_threshold(value: &str) -> Result<f64, String> {
     let parsed: f64 = value
         .parse()
@@ -80,6 +126,14 @@ pub struct Cli {
         value_parser = clap::value_parser!(u8).range(1..=100)
     )]
     pub concurrency_limit: u8,
+
+    #[arg(
+        short = 'l',
+        long,
+        help = "The rate limit for all requests in the format 'requests/time[unit]', where unit can be seconds (`s`), minutes (`m`), or hours (`h`). E.g. '-l 300/5m' for 300 requests per 5 minutes, or '-l 100/1h' for 100 requests per hour.",
+        value_parser = parse_rate_limit
+    )]
+    pub rate_limit: Option<u32>, // Returns requests per 1 minute
 
     #[arg(
         short = 'o',

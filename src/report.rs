@@ -8,6 +8,7 @@ use reqwest::StatusCode;
 use serde_json::json;
 use std::collections::{HashMap, VecDeque};
 use std::error::Error;
+use std::fmt::format;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -25,6 +26,7 @@ pub struct Response {
 pub struct Report {
     pub sitemap_url: String,
     pub concurrency_limit: u8,
+    pub rate_limit: Option<u32>,
     pub total_time: Duration,
     pub responses: VecDeque<Response>,
 }
@@ -45,6 +47,16 @@ impl Report {
                 value: self.concurrency_limit.to_string(),
                 json_label: "concurrencyLimit",
                 json_value: json!(self.concurrency_limit),
+            },
+            Entry {
+                label: "Rate Limit",
+                value: if self.rate_limit.is_some() {
+                    format!("{}/min", self.rate_limit.unwrap().to_string())
+                } else {
+                    "No".to_string()
+                },
+                json_label: "rateLimit",
+                json_value: json!(self.rate_limit),
             },
             Entry {
                 label: "Elapsed Time",
