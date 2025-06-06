@@ -10,15 +10,16 @@ features such as authentication, concurrency control, caching bypass, and more.
 
 - Fetch and parse sitemap.xml to extract URLs, including nested Sitemap Index files
   recursively.
-- Check the existence and response times of each URL
-- Generate a detailed performance report (e.g. `report.csv`)
-- Support for Basic Authentication
-- Adjustable concurrency limits for request handling
-- Configurable request timeout settings
-- Custom User-Agent header support
-- Option to append random timestamps to URLs to bypass caching mechanisms
-- Redirect handling with security precautions
-- Filtering and reporting slow URLs based on a threshold
+- Check the existence and response times of each URL.
+- Generate a detailed performance CSV report.
+- Support for Basic Authentication.
+- Adjustable concurrency limits for request handling.
+- Configurable request timeout settings.
+- Support for configuring rate limits, such as 300 requests per 5-minute interval.
+- Redirect handling with security precautions.
+- Filtering and reporting slow URLs based on a threshold.
+- Custom User-Agent header support.
+- Option to append random timestamps to URLs to bypass caching mechanisms.
 - Save downloaded documents for further inspection or use as a static site mirror.
 
 ## Installation
@@ -60,6 +61,11 @@ Options:
           Basic authentication credentials in the format `username:password`
   -c, --concurrency-limit <CONCURRENCY_LIMIT>
           Maximum number of concurrent requests allowed [default: 4]
+  -l, --rate-limit <RATE_LIMIT>
+          The rate limit for all requests in the format 'requests/time[unit]',
+          where unit can be seconds (`s`), minutes (`m`), or hours (`h`). E.g.
+          '-l 300/5m' for 300 requests per 5 minutes, or '-l 100/1h' for 100
+          requests per hour.
   -o, --output-dir <OUTPUT_DIR>
           Directory where all downloaded documents will be saved
   -a, --append-timestamp
@@ -72,7 +78,7 @@ Options:
           Default timeout (in seconds) for each request [default: 10]
       --user-agent <USER_AGENT>
           Custom User-Agent header to be used in requests [default: "Mozilla/5.0
-          (compatible; Siteprobe/0.3.0)"]
+          (compatible; Siteprobe/0.5.0)"]
       --slow-num <SLOW_NUM>
           Limit the number of slow documents displayed in the report. [default:
           100]
