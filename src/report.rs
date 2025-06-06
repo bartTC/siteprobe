@@ -8,7 +8,6 @@ use reqwest::StatusCode;
 use serde_json::json;
 use std::collections::{HashMap, VecDeque};
 use std::error::Error;
-use std::fmt::format;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -51,7 +50,7 @@ impl Report {
             Entry {
                 label: "Rate Limit",
                 value: if self.rate_limit.is_some() {
-                    format!("{}/min", self.rate_limit.unwrap().to_string())
+                    format!("{}/min", self.rate_limit.unwrap())
                 } else {
                     "No".to_string()
                 },
