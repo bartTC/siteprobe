@@ -158,8 +158,21 @@ pub async fn fetch_and_generate_report(
     options: &Cli,
     start_time: &Instant,
 ) -> Result<Report, Box<dyn Error>> {
-    // Setup progress bars.
+    // Setup concurrency
     let semaphore = Arc::new(Semaphore::new(options.concurrency_limit as usize));
+
+    // Setup rate limiter .
+    let rate_limit_setup = Arc::new(RateLimitSetup {
+        limit: options.rate_limit,
+        limiter: options.rate_limit.map(|rate_limit_value| {
+            RateLimiter::direct(
+                Quota::per_minute(NonZeroU32::new(rate_limit_value).unwrap())
+                    .allow_burst(NonZeroU32::new(1).unwrap()),
+            )
+        }),
+    });
+
+    // Setup progress bars.
     let wrapper_pb = indicatif::MultiProgress::new();
     let loading_pb = wrapper_pb.add(indicatif::ProgressBar::new(urls.len() as u64));
     loading_pb.set_style(
@@ -171,17 +184,6 @@ pub async fn fetch_and_generate_report(
             .unwrap()
             .progress_chars("■┄"),
     );
-
-    // Setup rate limiter for 100 requests per 5 minutes.
-    let rate_limit_setup = Arc::new(RateLimitSetup {
-        limit: options.rate_limit,
-        limiter: options.rate_limit.map(|rate_limit_value| {
-            RateLimiter::direct(
-                Quota::per_minute(NonZeroU32::new(rate_limit_value).unwrap())
-                    .allow_burst(NonZeroU32::new(1).unwrap()),
-            )
-        }),
-    });
 
     let fetches = urls.iter().map(|u| {
         let semaphore = Arc::clone(&semaphore);

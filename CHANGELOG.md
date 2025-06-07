@@ -1,6 +1,11 @@
 # Changelog
 
-## v0.5.0
+## v0.5.2 (2025-05-11)
+
+- Fixed an issue where the calculated rate goes under the rate limiter threshold of 1
+  per minute.
+
+## v0.5.0 (2025-06-07)
 
 - Enhance the clarity of error messages.
 - Introduced a new rate-limiting feature, allowing users to define the rate at which
