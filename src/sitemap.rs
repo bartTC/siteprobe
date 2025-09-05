@@ -122,11 +122,10 @@ pub fn extract_sitemap_urls(xml: &str) -> Vec<String> {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) if e.name().as_ref() == b"loc" => {
                 // Read the next text event which contains the URL
-                if let Ok(Event::Text(e)) = reader.read_event_into(&mut buf) {
-                    if let Ok(url) = e.unescape() {
+                if let Ok(Event::Text(e)) = reader.read_event_into(&mut buf)
+                    && let Ok(url) = e.unescape() {
                         urls.push(url.into_owned());
                     }
-                }
             }
             Ok(Event::Eof) => break,
             Err(_) => break,

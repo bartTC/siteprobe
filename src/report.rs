@@ -271,11 +271,10 @@ impl Report {
                 redirect_count += 1;
             }
 
-            if let Some(threshold) = slow_threshold {
-                if response.response_time.as_secs_f64() > threshold {
+            if let Some(threshold) = slow_threshold
+                && response.response_time.as_secs_f64() > threshold {
                     slow_count += 1;
                 }
-            }
         }
 
         let success_rate = (success_count as f64 / total_requests as f64) * 100.0;
