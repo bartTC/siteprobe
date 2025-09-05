@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.0 (2025-09-05)
+
+- This has demonstrated stability and maturity, making it suitable for a v1.0 release.
+
 ## v0.5.2 (2025-05-11)
 
 - Fixed an issue where the calculated rate goes under the rate limiter threshold of 1
