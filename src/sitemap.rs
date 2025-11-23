@@ -86,6 +86,10 @@ pub async fn get_sitemap_urls(
         urls.extend(extract_sitemap_urls(&content));
     }
 
+    // Deduplicate URLs - a URL might appear in multiple sitemap files
+    urls.sort();
+    urls.dedup();
+
     Ok(urls)
 }
 

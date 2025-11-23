@@ -25,7 +25,7 @@ use std::collections::HashMap;
 ///
 /// ### Example:
 ///
-/// ```rust
+/// ```rust,ignore
 /// use your_module_name::{LabeledValue, Metrics};
 ///
 /// let metrics = Metrics(vec![
@@ -37,7 +37,7 @@ use std::collections::HashMap;
 /// ```
 ///
 /// ### Output:
-/// ```
+/// ```text
 /// ┌──────────┬──────────┐
 /// │  Key1    │  Value1  │
 /// │  Key2    │  Value2  │
