@@ -2,3 +2,4 @@
 *.csv
 *.json
 tarpaulin-report.html
+*.profraw

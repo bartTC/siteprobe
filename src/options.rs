@@ -107,7 +107,7 @@ fn parse_slow_threshold(value: &str) -> Result<f64, String> {
 }
 
 #[derive(Debug, Parser)]
-#[command(term_width = 80)]
+#[command(term_width = 80, version)]
 pub struct Cli {
     #[arg(
         help = "The URL of the sitemap to be fetched and processed.",
