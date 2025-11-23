@@ -231,8 +231,11 @@ impl Report {
             report.responses.iter().map(|r| r.response_time).collect();
         let response_sizes: Vec<usize> = report.responses.iter().map(|r| r.response_size).collect();
 
-        let avg_response_time =
-            response_times.iter().map(|d| d.as_secs_f64()).sum::<f64>() / total_requests as f64;
+        let avg_response_time = if total_requests > 0 {
+            response_times.iter().map(|d| d.as_secs_f64()).sum::<f64>() / total_requests as f64
+        } else {
+            0.0
+        };
         let median_response_time = response_times.get(response_times.len() / 2).copied();
         let min_response_time = response_times.iter().copied().min();
         let max_response_time = response_times.iter().copied().max();
@@ -246,11 +249,15 @@ impl Report {
             .get((response_times.len() as f64 * 0.99) as usize)
             .copied();
 
-        let variance = response_times
-            .iter()
-            .map(|t| (t.as_secs_f64() - avg_response_time).powi(2))
-            .sum::<f64>()
-            / total_requests as f64;
+        let variance = if total_requests > 0 {
+            response_times
+                .iter()
+                .map(|t| (t.as_secs_f64() - avg_response_time).powi(2))
+                .sum::<f64>()
+                / total_requests as f64
+        } else {
+            0.0
+        };
         let std_dev = variance.sqrt();
 
         let mut status_counts: HashMap<StatusCode, usize> = HashMap::new();
@@ -277,12 +284,32 @@ impl Report {
                 }
         }
 
-        let success_rate = (success_count as f64 / total_requests as f64) * 100.0;
-        let error_rate = (error_count as f64 / total_requests as f64) * 100.0;
-        let redirect_rate = (redirect_count as f64 / total_requests as f64) * 100.0;
-        let slow_request_percentage = (slow_count as f64 / total_requests as f64) * 100.0;
+        let success_rate = if total_requests > 0 {
+            (success_count as f64 / total_requests as f64) * 100.0
+        } else {
+            0.0
+        };
+        let error_rate = if total_requests > 0 {
+            (error_count as f64 / total_requests as f64) * 100.0
+        } else {
+            0.0
+        };
+        let redirect_rate = if total_requests > 0 {
+            (redirect_count as f64 / total_requests as f64) * 100.0
+        } else {
+            0.0
+        };
+        let slow_request_percentage = if total_requests > 0 {
+            (slow_count as f64 / total_requests as f64) * 100.0
+        } else {
+            0.0
+        };
 
-        let avg_response_size = response_sizes.iter().sum::<usize>() / total_requests;
+        let avg_response_size = if total_requests > 0 {
+            response_sizes.iter().sum::<usize>() / total_requests
+        } else {
+            0
+        };
         let min_response_size = response_sizes.iter().copied().min();
         let max_response_size = response_sizes.iter().copied().max();
 
