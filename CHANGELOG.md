@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.0 (2025-11-23)
+
+- Fixed a division by zero error when the sitemap contains no URLs or no URLs are processed.
+- Fixed table border misalignment in the report by replacing emojis with inconsistent width handling.
+- Fixed potential integer overflow in random number generation.
+- Fixed type mismatches for `SLOW_NUM` and `request_timeout` options.
+
 ## v1.0.0 (2025-09-05)
 
 - This has demonstrated stability and maturity, making it suitable for a v1.0 release.
