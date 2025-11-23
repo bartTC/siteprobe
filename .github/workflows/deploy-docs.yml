@@ -1,0 +1,38 @@
+---
+name: Deploy Documentation
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build and deploy documentation
+        uses: bartTC/microdocs@main
+        with:
+          files: |
+            README.md
+            CHANGELOG.md
+          title: "Siteprobe"
+          output: "docs/index.html"
+          repo-url: "https://github.com/${{ github.repository }}"
