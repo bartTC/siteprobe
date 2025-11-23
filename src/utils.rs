@@ -73,6 +73,7 @@ pub fn truncate_message(message: &str, max_width: usize) -> String {
 /// ```
 pub fn generate_random_number(length: u32) -> u64 {
     assert!(length > 0, "length must be greater than 0");
+    assert!(length <= 19, "length must be at most 19 to fit in u64");
     let range = 10u64.pow(length - 1)..10u64.pow(length);
     rand::rng().random_range(range)
 }

@@ -20,7 +20,7 @@ pub mod defaults {
     );
 
     /// The maximum number of slow documents to show
-    pub const SLOW_NUM: i32 = 100;
+    pub const SLOW_NUM: u32 = 100;
 }
 
 fn validate_output_dir_str(s: &str) -> Result<PathBuf, String> {
@@ -179,10 +179,10 @@ pub struct Cli {
         short = 't',
         long,
         help = "Default timeout (in seconds) for each request",
-        default_value_t = defaults::TIMEOUT as u8,
-        value_parser = clap::value_parser!(u8).range(1..=60)
+        default_value_t = defaults::TIMEOUT,
+        value_parser = clap::value_parser!(u64).range(1..)
     )]
-    pub request_timeout: u8,
+    pub request_timeout: u64,
 
     #[arg(
         long,
@@ -194,7 +194,7 @@ pub struct Cli {
     #[arg(
         long,
         help = "Limit the number of slow documents displayed in the report.",
-        default_value_t = defaults::SLOW_NUM as u32,
+        default_value_t = defaults::SLOW_NUM,
         value_parser = clap::value_parser!(u32).range(1..)
     )]
     pub slow_num: u32,
