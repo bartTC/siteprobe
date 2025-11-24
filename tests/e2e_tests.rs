@@ -4,29 +4,14 @@ use std::process::Command;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-/// Helper to create a temporary directory that will be cleaned up when dropped
-struct TempDir {
-    path: PathBuf,
+fn temp_dir(prefix: &str) -> tempfile::TempDir {
+    tempfile::Builder::new()
+        .prefix(&format!("siteprobe_test_{}_", prefix))
+        .tempdir()
+        .expect("Failed to create temp dir")
 }
 
-impl TempDir {
-    fn new(prefix: &str) -> Self {
-        let path =
-            std::env::temp_dir().join(format!("siteprobe_test_{}_{}", prefix, std::process::id()));
-        fs::create_dir_all(&path).expect("Failed to create temp dir");
-        TempDir { path }
-    }
 
-    fn path(&self) -> &PathBuf {
-        &self.path
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.path);
-    }
-}
 
 /// Helper to build common CLI arguments for E2E tests
 fn build_cli_args(
@@ -80,7 +65,7 @@ fn build_cli_args(
 }
 
 #[tokio::test]
-async fn test_e2e_valid_single_sitemap() {
+async fn test_e2e_valid_sitemap() {
     // True E2E test: single valid sitemap file (not an index)
 
     let mock_server = MockServer::start().await;
@@ -115,7 +100,7 @@ async fn test_e2e_valid_single_sitemap() {
         .await;
 
     // Create temporary directory for test outputs
-    let temp_dir = TempDir::new("single_sitemap");
+    let temp_dir = temp_dir("single_sitemap");
     let csv_report = temp_dir.path().join("report.csv");
     let json_report = temp_dir.path().join("report.json");
     let output_dir = temp_dir.path().join("pages");
@@ -193,7 +178,7 @@ async fn test_e2e_valid_single_sitemap() {
 }
 
 #[tokio::test]
-async fn test_e2e_sitemap_with_basic_auth() {
+async fn test_e2e_valid_sitemap_with_basic_auth() {
     // True E2E test: sitemap requiring basic authentication
     use wiremock::matchers::header;
 
@@ -253,7 +238,7 @@ async fn test_e2e_sitemap_with_basic_auth() {
         .await;
 
     // Create temporary directory for test outputs
-    let temp_dir = TempDir::new("basic_auth");
+    let temp_dir = temp_dir("basic_auth");
     let csv_report = temp_dir.path().join("report.csv");
     let json_report = temp_dir.path().join("report.json");
 
@@ -336,7 +321,7 @@ async fn test_e2e_sitemap_with_basic_auth() {
 }
 
 #[tokio::test]
-async fn test_e2e_valid_sitemap_index_processing() {
+async fn test_e2e_valid_sitemap_index() {
     // True E2E test: invoke CLI binary with mocked network for sitemap index
 
     let mock_server = MockServer::start().await;
@@ -402,7 +387,7 @@ async fn test_e2e_valid_sitemap_index_processing() {
     }
 
     // Create temporary directory for test outputs
-    let temp_dir = TempDir::new("sitemap_index");
+    let temp_dir = temp_dir("sitemap_index");
     let csv_report = temp_dir.path().join("report.csv");
     let json_report = temp_dir.path().join("report.json");
     let output_dir = temp_dir.path().join("pages");
@@ -528,7 +513,7 @@ async fn test_e2e_invalid_sitemap_index() {
     // Don't mock the referenced sitemaps - they'll 404
 
     // Create temporary directory for test outputs
-    let temp_dir = TempDir::new("invalid_index");
+    let temp_dir = temp_dir("invalid_index");
     let csv_report = temp_dir.path().join("report.csv");
     let json_report = temp_dir.path().join("report.json");
 

@@ -6,28 +6,80 @@ use siteprobe::sitemap::{extract_sitemap_urls, identify_sitemap_type, SitemapTyp
 
 #[test]
 fn test_identify_sitemap_type_urlset() {
-    let xml = include_str!("fixtures/sitemap_valid.xml");
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+   <url>
+      <loc>http://www.example.com/</loc>
+      <lastmod>2005-01-01</lastmod>
+      <changefreq>monthly</changefreq>
+      <priority>0.8</priority>
+   </url>
+   <url>
+      <loc>http://www.example.com/catalog?item=12&amp;desc=vacation_hawaii</loc>
+      <changefreq>weekly</changefreq>
+   </url>
+   <url>
+      <loc>http://www.example.com/catalog?item=73&amp;desc=vacation_new_zealand</loc>
+      <lastmod>2004-12-23</lastmod>
+      <changefreq>weekly</changefreq>
+   </url>
+   <url>
+      <loc>http://www.example.com/catalog?item=74&amp;desc=vacation_newfoundland</loc>
+      <lastmod>2004-12-23T18:00:15+00:00</lastmod>
+      <priority>0.3</priority>
+   </url>
+   <url>
+      <loc>http://www.example.com/catalog?item=83&amp;desc=vacation_usa</loc>
+      <lastmod>2004-11-23</lastmod>
+   </url>
+</urlset>"#;
     let result = identify_sitemap_type(xml);
     assert_eq!(result, SitemapType::UrlSet);
 }
 
 #[test]
 fn test_identify_sitemap_type_sitemapindex() {
-    let xml = include_str!("fixtures/sitemap_index_valid.xml");
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+   <sitemap>
+      <loc>http://www.example.com/sitemap1.xml</loc>
+      <lastmod>2004-10-01T18:23:17+00:00</lastmod>
+   </sitemap>
+   <sitemap>
+      <loc>http://www.example.com/sitemap2.xml</loc>
+      <lastmod>2005-01-01</lastmod>
+   </sitemap>
+   <sitemap>
+      <loc>http://www.example.com/sitemap3.xml</loc>
+   </sitemap>
+</sitemapindex>"#;
     let result = identify_sitemap_type(xml);
     assert_eq!(result, SitemapType::SitemapIndex);
 }
 
 #[test]
 fn test_identify_sitemap_type_invalid() {
-    let xml = include_str!("fixtures/sitemap_invalid.xml");
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+   <channel>
+      <title>Example RSS Feed</title>
+      <link>http://www.example.com/</link>
+      <description>This is not a sitemap</description>
+      <item>
+         <title>Example Item</title>
+         <link>http://www.example.com/item1</link>
+      </item>
+   </channel>
+</rss>"#;
     let result = identify_sitemap_type(xml);
     assert_eq!(result, SitemapType::Unknown);
 }
 
 #[test]
 fn test_identify_sitemap_type_empty() {
-    let xml = include_str!("fixtures/sitemap_empty.xml");
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+</urlset>"#;
     let result = identify_sitemap_type(xml);
     assert_eq!(result, SitemapType::UrlSet);
 }
@@ -52,7 +104,33 @@ fn test_identify_sitemap_type_empty_string() {
 
 #[test]
 fn test_extract_sitemap_urls_valid() {
-    let xml = include_str!("fixtures/sitemap_valid.xml");
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+   <url>
+      <loc>http://www.example.com/</loc>
+      <lastmod>2005-01-01</lastmod>
+      <changefreq>monthly</changefreq>
+      <priority>0.8</priority>
+   </url>
+   <url>
+      <loc>http://www.example.com/catalog?item=12&amp;desc=vacation_hawaii</loc>
+      <changefreq>weekly</changefreq>
+   </url>
+   <url>
+      <loc>http://www.example.com/catalog?item=73&amp;desc=vacation_new_zealand</loc>
+      <lastmod>2004-12-23</lastmod>
+      <changefreq>weekly</changefreq>
+   </url>
+   <url>
+      <loc>http://www.example.com/catalog?item=74&amp;desc=vacation_newfoundland</loc>
+      <lastmod>2004-12-23T18:00:15+00:00</lastmod>
+      <priority>0.3</priority>
+   </url>
+   <url>
+      <loc>http://www.example.com/catalog?item=83&amp;desc=vacation_usa</loc>
+      <lastmod>2004-11-23</lastmod>
+   </url>
+</urlset>"#;
     let urls = extract_sitemap_urls(xml);
     
     assert_eq!(urls.len(), 5);
@@ -65,7 +143,20 @@ fn test_extract_sitemap_urls_valid() {
 
 #[test]
 fn test_extract_sitemap_urls_from_index() {
-    let xml = include_str!("fixtures/sitemap_index_valid.xml");
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+   <sitemap>
+      <loc>http://www.example.com/sitemap1.xml</loc>
+      <lastmod>2004-10-01T18:23:17+00:00</lastmod>
+   </sitemap>
+   <sitemap>
+      <loc>http://www.example.com/sitemap2.xml</loc>
+      <lastmod>2005-01-01</lastmod>
+   </sitemap>
+   <sitemap>
+      <loc>http://www.example.com/sitemap3.xml</loc>
+   </sitemap>
+</sitemapindex>"#;
     let urls = extract_sitemap_urls(xml);
     
     assert_eq!(urls.len(), 3);
@@ -76,7 +167,19 @@ fn test_extract_sitemap_urls_from_index() {
 
 #[test]
 fn test_extract_sitemap_urls_with_escapes() {
-    let xml = include_str!("fixtures/sitemap_with_escapes.xml");
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+   <url>
+      <loc>http://www.example.com/page?id=1&amp;category=test</loc>
+      <lastmod>2005-01-01</lastmod>
+   </url>
+   <url>
+      <loc>http://www.example.com/special&lt;chars&gt;</loc>
+   </url>
+   <url>
+      <loc>http://www.example.com/path/with/&quot;quotes&quot;</loc>
+   </url>
+</urlset>"#;
     let urls = extract_sitemap_urls(xml);
     
     assert_eq!(urls.len(), 3);
@@ -88,7 +191,9 @@ fn test_extract_sitemap_urls_with_escapes() {
 
 #[test]
 fn test_extract_sitemap_urls_empty() {
-    let xml = include_str!("fixtures/sitemap_empty.xml");
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+</urlset>"#;
     let urls = extract_sitemap_urls(xml);
     
     assert_eq!(urls.len(), 0);
