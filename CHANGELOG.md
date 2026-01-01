@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.2.0 (2026-01-01)
+
+- Added tilde (`~`) expansion support for path arguments (`--report-path`,
+  `--report-path-json`, `--output-dir`). Previously, using the `=` syntax
+  (e.g., `--report-path-json=~/report.json`) would fail because the shell
+  doesn't expand `~` in that context.
+
 ## v1.1.0 (2025-11-23)
 
 - Fixed a division by zero error when the sitemap contains no URLs or no URLs are processed.

@@ -315,3 +315,112 @@ fn test_cli_output_dir_option() {
     assert!(!stderr.contains("unrecognized") && !stderr.contains("unexpected"),
         "Should accept --output-dir option");
 }
+
+#[test]
+fn test_cli_tilde_expansion_report_path_json() {
+    // Test that tilde is expanded correctly in --report-path-json
+    // Using = syntax which previously didn't expand tilde
+    let home = std::env::var("HOME").expect("HOME not set");
+    let test_dir_name = format!("siteprobe_test_{}", std::process::id());
+    let test_path = format!("{}/{}", home, test_dir_name);
+
+    // Clean up in case of previous failed run
+    let _ = std::fs::remove_dir_all(&test_path);
+    std::fs::create_dir_all(&test_path).expect("Failed to create test dir");
+
+    let report_path = format!("~/{}/report.json", test_dir_name);
+
+    // Run siteprobe with tilde path using = syntax
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "--quiet",
+            "--",
+            "http://example.com/sitemap.xml",
+            &format!("--report-path-json={}", report_path),
+        ])
+        .output()
+        .expect("Failed to execute siteprobe binary");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Should not fail due to path parsing
+    assert!(!stderr.contains("No such file or directory") || !stderr.contains(&report_path),
+        "Tilde should be expanded, not treated as literal path");
+
+    // Clean up
+    let _ = std::fs::remove_dir_all(&test_path);
+}
+
+#[test]
+fn test_cli_tilde_expansion_report_path_csv() {
+    // Test that tilde is expanded correctly in --report-path
+    let home = std::env::var("HOME").expect("HOME not set");
+    let test_dir_name = format!("siteprobe_test_{}", std::process::id());
+    let test_path = format!("{}/{}", home, test_dir_name);
+
+    // Clean up in case of previous failed run
+    let _ = std::fs::remove_dir_all(&test_path);
+    std::fs::create_dir_all(&test_path).expect("Failed to create test dir");
+
+    let report_path = format!("~/{}/report.csv", test_dir_name);
+
+    // Run siteprobe with tilde path using = syntax
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "--quiet",
+            "--",
+            "http://example.com/sitemap.xml",
+            &format!("--report-path={}", report_path),
+        ])
+        .output()
+        .expect("Failed to execute siteprobe binary");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Should not fail due to path parsing (the ~ literal path error)
+    assert!(!stderr.contains("No such file or directory") || !stderr.contains(&report_path),
+        "Tilde should be expanded, not treated as literal path");
+
+    // Clean up
+    let _ = std::fs::remove_dir_all(&test_path);
+}
+
+#[test]
+fn test_cli_tilde_expansion_output_dir() {
+    // Test that tilde is expanded correctly in --output-dir
+    let home = std::env::var("HOME").expect("HOME not set");
+    let test_dir_name = format!("siteprobe_test_output_{}", std::process::id());
+    let test_path = format!("{}/{}", home, test_dir_name);
+
+    // Clean up in case of previous failed run
+    let _ = std::fs::remove_dir_all(&test_path);
+
+    let output_dir = format!("~/{}", test_dir_name);
+
+    // Run siteprobe with tilde path using = syntax
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "--quiet",
+            "--",
+            "http://example.com/sitemap.xml",
+            &format!("--output-dir={}", output_dir),
+        ])
+        .output()
+        .expect("Failed to execute siteprobe binary");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Should not fail with "Failed to create directory" for the tilde path
+    assert!(!stderr.contains("Failed to create directory"),
+        "Tilde should be expanded, directory creation should work");
+
+    // The directory should have been created in the home folder
+    assert!(std::path::Path::new(&test_path).exists(),
+        "Directory should be created at expanded path: {}", test_path);
+
+    // Clean up
+    let _ = std::fs::remove_dir_all(&test_path);
+}

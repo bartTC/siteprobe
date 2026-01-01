@@ -23,8 +23,13 @@ pub mod defaults {
     pub const SLOW_NUM: u32 = 100;
 }
 
+/// Expands shell-style tilde (`~`) in paths to the user's home directory.
+pub fn expand_path(s: &str) -> Result<PathBuf, String> {
+    Ok(PathBuf::from(shellexpand::tilde(s).into_owned()))
+}
+
 fn validate_output_dir_str(s: &str) -> Result<PathBuf, String> {
-    let path = PathBuf::from(s);
+    let path = expand_path(s)?;
     if path.exists() && path.is_dir() {
         println!(
             "\n⚠️ The output directory '{}' already exists. Existing documents will be overwritten.\n",
@@ -162,7 +167,7 @@ pub struct Cli {
         long,
         help = "File path for storing the generated `report.csv`",
         value_hint = ValueHint::FilePath,
-        value_parser = clap::value_parser!(PathBuf)
+        value_parser = expand_path
     )]
     pub report_path: Option<PathBuf>,
 
@@ -171,7 +176,7 @@ pub struct Cli {
         long,
         help = "File path for storing the generated `report.json`",
         value_hint = ValueHint::FilePath,
-        value_parser = clap::value_parser!(PathBuf)
+        value_parser = expand_path
     )]
     pub report_path_json: Option<PathBuf>,
 
@@ -213,4 +218,42 @@ pub struct Cli {
         help = "Controls automatic redirects. When enabled, the client will follow HTTP redirects (up to 10 by default). Note that for security, Basic Authentication credentials are intentionally not forwarded during redirects to prevent unintended credential exposure."
     )]
     pub follow_redirects: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_expand_path_tilde() {
+        let home = std::env::var("HOME").expect("HOME not set");
+        let result = expand_path("~/test/path").unwrap();
+        assert_eq!(result, PathBuf::from(format!("{}/test/path", home)));
+    }
+
+    #[test]
+    fn test_expand_path_tilde_only() {
+        let home = std::env::var("HOME").expect("HOME not set");
+        let result = expand_path("~").unwrap();
+        assert_eq!(result, PathBuf::from(home));
+    }
+
+    #[test]
+    fn test_expand_path_no_tilde() {
+        let result = expand_path("/absolute/path/to/file").unwrap();
+        assert_eq!(result, PathBuf::from("/absolute/path/to/file"));
+    }
+
+    #[test]
+    fn test_expand_path_relative() {
+        let result = expand_path("relative/path").unwrap();
+        assert_eq!(result, PathBuf::from("relative/path"));
+    }
+
+    #[test]
+    fn test_expand_path_tilde_in_middle_not_expanded() {
+        // Tilde in the middle of a path should NOT be expanded
+        let result = expand_path("/path/~/to/file").unwrap();
+        assert_eq!(result, PathBuf::from("/path/~/to/file"));
+    }
 }
