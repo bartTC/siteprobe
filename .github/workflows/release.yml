@@ -324,11 +324,10 @@ jobs:
           done
           git push
 
-  # Build Python wheels for PyPI
+  # Build Python wheels for PyPI (runs in parallel with dist builds)
   build-pypi-wheels:
     needs:
       - plan
-      - host
     if: ${{ needs.plan.outputs.publishing == 'true' }}
     strategy:
       matrix:
@@ -354,10 +353,11 @@ jobs:
           name: pypi-wheels-${{ matrix.os }}-${{ matrix.target }}
           path: dist/*.whl
 
-  # Upload all wheels to PyPI
+  # Upload all wheels to PyPI (after GitHub release exists)
   publish-pypi:
     needs:
       - build-pypi-wheels
+      - host
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
