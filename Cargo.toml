@@ -1,6 +1,6 @@
 [package]
 name = "siteprobe"
-version = "1.2.0"
+version = "1.2.1"
 license = "MIT"
 edition = "2024"
 authors = ["Martin Mahner <martin@elephant.house>"]

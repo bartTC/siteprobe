@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.1 (2026-01-20)
+
+- Added Homebrew installation support (`brew install bartTC/siteprobe/siteprobe`).
+- Added PyPI installation support (`pip install siteprobe` or `pipx install siteprobe`).
+- Shortened package description for Homebrew compatibility.
+
 ## v1.2.0 (2026-01-01)
 
 - Added tilde (`~`) expansion support for path arguments (`--report-path`,
