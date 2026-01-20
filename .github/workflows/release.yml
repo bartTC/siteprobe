@@ -338,7 +338,7 @@ jobs:
             target: aarch64-unknown-linux-gnu
           - os: macos-14
             target: aarch64-apple-darwin
-          - os: macos-13
+          - os: macos-15-intel
             target: x86_64-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
@@ -355,10 +355,14 @@ jobs:
   # Upload all wheels to PyPI (after GitHub release exists)
   publish-pypi:
     needs:
+      - plan
       - build-pypi-wheels
       - host
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           pattern: pypi-wheels-*
@@ -368,6 +372,28 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_TOKEN }}
+      - name: Add PyPI instructions to release notes
+        run: |
+          VERSION="${{ needs.plan.outputs.tag }}"
+          CURRENT_BODY=$(gh release view "$VERSION" --json body -q .body)
+
+          PYPI_INSTRUCTIONS="### Install prebuilt binaries via pip
+
+          \`\`\`sh
+          pip install siteprobe
+          \`\`\`
+
+          ### Run without installing via pipx or uvx
+
+          \`\`\`sh
+          pipx run siteprobe
+          # or
+          uvx siteprobe
+          \`\`\`"
+
+          gh release edit "$VERSION" --notes "${CURRENT_BODY}
+
+          ${PYPI_INSTRUCTIONS}"
 
   announce:
     needs:
