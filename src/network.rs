@@ -57,23 +57,6 @@ pub fn build_client(options: &Cli) -> Result<reqwest::Client, Box<dyn Error>> {
 ///
 /// # Errors
 ///
-/// This function will return an error if:
-/// - The GET request fails (e.g., network issues).
-/// - The HTTP response status is not successful (e.g., 4xx or 5xx error).
-/// - The response body cannot be converted to text.
-pub async fn get_url_content(
-    url: &str,
-    client: &reqwest::Client,
-) -> Result<String, reqwest::Error> {
-    client
-        .get(url)
-        .send()
-        .await?
-        .error_for_status()?
-        .text()
-        .await
-}
-
 /// Fetches the content at the specified URL using the given HTTP client.
 ///
 /// This asynchronous function makes a GET request to the specified URL and captures:

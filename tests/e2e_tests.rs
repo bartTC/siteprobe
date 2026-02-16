@@ -30,8 +30,6 @@ fn build_cli_args(
         "10".to_string(),
         "--concurrency-limit".to_string(),
         "5".to_string(),
-        "--slow-threshold".to_string(),
-        "0".to_string(),
         "--slow-num".to_string(),
         "5".to_string(),
         "--rate-limit".to_string(),

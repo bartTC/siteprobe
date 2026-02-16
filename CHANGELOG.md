@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.3.0 (2026-02-16)
+
+- Added gzip sitemap support. Siteprobe now handles `.xml.gz` sitemaps,
+  detecting gzip compression via URL suffix or magic bytes and decompressing
+  automatically. Sitemap index files referencing `.xml.gz` entries are also
+  supported.
+- Added meaningful exit codes for CI/CD integration: `0` for success, `1` if
+  any URL returned 4xx/5xx or failed, `2` if any URL exceeded the slow
+  threshold (`--slow-threshold`).
+- Added `--retries N` option (default: 0) to retry failed requests. Retries
+  on network errors or 5xx responses with a 1-second delay between attempts.
+- Added `--json` flag to output the JSON report to stdout, suppressing all
+  other console output for clean piping into other tools.
+- Added `--report-path-html` option to generate a self-contained HTML report
+  with summary statistics, response time distribution histogram, status code
+  breakdown chart, and a sortable table of all responses.
+- Added `.siteprobe.toml` config file support. Options can be set in a TOML
+  file (loaded from the current directory by default, or via `--config`).
+  CLI arguments take priority over config file values.
+- Updated README with all installation methods (`uvx`, `pipx`, Homebrew,
+  pip, Cargo).
+
 ## v1.2.2 (2026-02-16)
 
 - Downgraded Rust edition from 2024 to 2021 for compatibility with older Rust

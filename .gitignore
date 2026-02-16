@@ -1,5 +1,5 @@
 /target
-*.csv
-*.json
-tarpaulin-report.html
+/*.csv
+/*.json
+/*.html
 *.profraw

@@ -1,4 +1,6 @@
-use siteprobe::sitemap::{extract_sitemap_urls, identify_sitemap_type, SitemapType};
+use siteprobe::sitemap::{
+    decompress_gzip, extract_sitemap_urls, identify_sitemap_type, is_gzip_content, SitemapType,
+};
 
 // ===========================================================================================
 // identify_sitemap_type Tests
@@ -310,4 +312,95 @@ fn test_extract_sitemap_urls_incomplete_xml() {
     let xml = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
     let urls = extract_sitemap_urls(xml);
     assert_eq!(urls.len(), 0);
+}
+
+// ===========================================================================================
+// Gzip Support Tests
+// ===========================================================================================
+
+#[test]
+fn test_is_gzip_content_by_url_suffix() {
+    assert!(is_gzip_content("https://example.com/sitemap.xml.gz", &[]));
+    assert!(is_gzip_content("https://example.com/sitemap.gz", &[]));
+    assert!(!is_gzip_content("https://example.com/sitemap.xml", &[]));
+}
+
+#[test]
+fn test_is_gzip_content_by_magic_bytes() {
+    // Gzip magic bytes: 0x1f, 0x8b
+    assert!(is_gzip_content("https://example.com/sitemap.xml", &[0x1f, 0x8b, 0x08]));
+    assert!(!is_gzip_content("https://example.com/sitemap.xml", &[0x3c, 0x3f]));
+    assert!(!is_gzip_content("https://example.com/sitemap.xml", &[0x1f]));
+    assert!(!is_gzip_content("https://example.com/sitemap.xml", &[]));
+}
+
+#[test]
+fn test_decompress_gzip_valid() {
+    use flate2::write::GzEncoder;
+    use flate2::Compression;
+    use std::io::Write;
+
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+   <url>
+      <loc>http://www.example.com/page1</loc>
+   </url>
+</urlset>"#;
+
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(xml.as_bytes()).unwrap();
+    let compressed = encoder.finish().unwrap();
+
+    let decompressed = decompress_gzip(&compressed).unwrap();
+    assert_eq!(decompressed, xml);
+
+    // Verify the decompressed XML can be parsed
+    let sitemap_type = identify_sitemap_type(&decompressed);
+    assert_eq!(sitemap_type, SitemapType::UrlSet);
+
+    let urls = extract_sitemap_urls(&decompressed);
+    assert_eq!(urls.len(), 1);
+    assert_eq!(urls[0], "http://www.example.com/page1");
+}
+
+#[test]
+fn test_decompress_gzip_invalid_data() {
+    let result = decompress_gzip(&[0x1f, 0x8b, 0x00, 0x00]);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_decompress_gzip_empty() {
+    let result = decompress_gzip(&[]);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_gzip_roundtrip_sitemap_index() {
+    use flate2::write::GzEncoder;
+    use flate2::Compression;
+    use std::io::Write;
+
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+   <sitemap>
+      <loc>http://www.example.com/sitemap1.xml.gz</loc>
+   </sitemap>
+   <sitemap>
+      <loc>http://www.example.com/sitemap2.xml.gz</loc>
+   </sitemap>
+</sitemapindex>"#;
+
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(xml.as_bytes()).unwrap();
+    let compressed = encoder.finish().unwrap();
+
+    let decompressed = decompress_gzip(&compressed).unwrap();
+    let sitemap_type = identify_sitemap_type(&decompressed);
+    assert_eq!(sitemap_type, SitemapType::SitemapIndex);
+
+    let urls = extract_sitemap_urls(&decompressed);
+    assert_eq!(urls.len(), 2);
+    assert_eq!(urls[0], "http://www.example.com/sitemap1.xml.gz");
+    assert_eq!(urls[1], "http://www.example.com/sitemap2.xml.gz");
 }

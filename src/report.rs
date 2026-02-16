@@ -11,7 +11,15 @@ use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
+use std::process::ExitCode;
 use std::time::Duration;
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
 
 #[derive(Debug, Clone)]
 pub struct Response {
@@ -142,19 +150,10 @@ impl Report {
         }
     }
 
-    pub fn write_json_report(
-        &self,
-        options: &Cli,
-        report_path: &PathBuf,
-    ) -> Result<(), Box<dyn Error>> {
-        // If the report path parent is a director, create it if it doesn't exist yet
-        if let Some(parent) = report_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
+    fn build_json_data(&self, options: &Cli) -> serde_json::Value {
         let statistics = self.generate_statistics(options.slow_threshold);
 
-        let json_data = json!(
+        json!(
             {
                "config": {
                     "sitemapUrl": self.sitemap_url,
@@ -176,22 +175,43 @@ impl Report {
                     })
                 }).collect::<Vec<serde_json::Value>>()
             }
-        );
+        )
+    }
+
+    /// Returns the JSON report as a pretty-printed string.
+    pub fn to_json_string(&self, options: &Cli) -> Result<String, Box<dyn Error>> {
+        let json_data = self.build_json_data(options);
+        Ok(serde_json::to_string_pretty(&json_data)?)
+    }
+
+    pub fn write_json_report(
+        &self,
+        options: &Cli,
+        report_path: &PathBuf,
+    ) -> Result<(), Box<dyn Error>> {
+        // If the report path parent is a director, create it if it doesn't exist yet
+        if let Some(parent) = report_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let json_data = self.build_json_data(options);
 
         // Write the JSON to a file
         let mut file = File::create(report_path)?;
         file.write_all(serde_json::to_string_pretty(&json_data)?.as_bytes())?;
 
-        println!(
-            "\n📄 The JSON report was written to {}",
-            style(report_path.display()).underlined().cyan()
-        );
+        if !options.json {
+            println!(
+                "\n📄 The JSON report was written to {}",
+                style(report_path.display()).underlined().cyan()
+            );
+        }
 
         Ok(())
     }
 
     /// Write a CSV report
-    pub fn write_csv_report(&self, report_path: &PathBuf) -> Result<(), Box<dyn Error>> {
+    pub fn write_csv_report(&self, report_path: &PathBuf, quiet: bool) -> Result<(), Box<dyn Error>> {
         // If the report path parent is a director, create it if it doesn't exist yet
         if let Some(parent) = report_path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -212,12 +232,398 @@ impl Report {
                 &r.status_code.to_string(),
             ])?;
         }
-        println!(
-            "\n📊 The CSV report was written to {}",
-            style(report_path.display()).underlined().cyan()
-        );
+        if !quiet {
+            println!(
+                "\n📊 The CSV report was written to {}",
+                style(report_path.display()).underlined().cyan()
+            );
+        }
 
         Ok(())
+    }
+
+    /// Write a self-contained HTML report
+    pub fn write_html_report(
+        &self,
+        options: &Cli,
+        report_path: &PathBuf,
+    ) -> Result<(), Box<dyn Error>> {
+        if let Some(parent) = report_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let stats = self.generate_statistics(options.slow_threshold);
+        let total_requests = self.responses.len();
+        let total_time_secs = self.total_time.as_secs_f64();
+
+        // Build status code counts for the bar chart
+        let mut status_counts: HashMap<u16, usize> = HashMap::new();
+        for r in &self.responses {
+            *status_counts.entry(r.status_code.as_u16()).or_insert(0) += 1;
+        }
+        let mut status_entries: Vec<(u16, usize)> = status_counts.into_iter().collect();
+        status_entries.sort_by_key(|&(code, _)| code);
+
+        // Build histogram buckets for response time distribution
+        let times_ms: Vec<f64> = self
+            .responses
+            .iter()
+            .map(|r| r.response_time.as_secs_f64() * 1000.0)
+            .collect();
+        let (histogram_svg, histogram_buckets_exist) = if !times_ms.is_empty() {
+            let min_t = times_ms.iter().cloned().fold(f64::INFINITY, f64::min);
+            let max_t = times_ms.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let bucket_count = 20usize;
+            let range = if (max_t - min_t).abs() < 0.001 {
+                1.0
+            } else {
+                max_t - min_t
+            };
+            let bucket_width = range / bucket_count as f64;
+            let mut buckets = vec![0usize; bucket_count];
+            for &t in &times_ms {
+                let idx = ((t - min_t) / bucket_width).floor() as usize;
+                let idx = idx.min(bucket_count - 1);
+                buckets[idx] += 1;
+            }
+            let max_count = *buckets.iter().max().unwrap_or(&1);
+            let chart_w = 600.0f64;
+            let chart_h = 200.0f64;
+            let bar_w = chart_w / bucket_count as f64;
+
+            let mut svg = format!(
+                r#"<svg viewBox="0 0 {vw} {vh}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px">"#,
+                vw = chart_w + 80.0,
+                vh = chart_h + 50.0
+            );
+            // Y axis label
+            svg.push_str(&format!(
+                r##"<text x="10" y="{}" font-size="11" fill="#64748b" text-anchor="middle" transform="rotate(-90,10,{})">Count</text>"##,
+                chart_h / 2.0 + 10.0,
+                chart_h / 2.0 + 10.0
+            ));
+            for (i, &count) in buckets.iter().enumerate() {
+                let bar_h = if max_count > 0 {
+                    (count as f64 / max_count as f64) * chart_h
+                } else {
+                    0.0
+                };
+                let x = 40.0 + i as f64 * bar_w;
+                let y = chart_h - bar_h + 10.0;
+                svg.push_str(&format!(
+                    r##"<rect x="{x:.1}" y="{y:.1}" width="{bw:.1}" height="{bh:.1}" fill="#6366f1" opacity="0.85" rx="1"><title>{lo:.0}-{hi:.0}ms: {count}</title></rect>"##,
+                    x = x,
+                    y = y,
+                    bw = bar_w - 1.0,
+                    bh = bar_h,
+                    lo = min_t + i as f64 * bucket_width,
+                    hi = min_t + (i + 1) as f64 * bucket_width,
+                    count = count
+                ));
+                // X-axis labels (every 4th bucket)
+                if i % 4 == 0 || i == bucket_count - 1 {
+                    svg.push_str(&format!(
+                        r##"<text x="{x:.1}" y="{y}" font-size="10" fill="#64748b" text-anchor="middle">{label:.0}</text>"##,
+                        x = x + bar_w / 2.0,
+                        y = chart_h + 25.0,
+                        label = min_t + i as f64 * bucket_width
+                    ));
+                }
+            }
+            // X axis title
+            svg.push_str(&format!(
+                r##"<text x="{}" y="{}" font-size="11" fill="#64748b" text-anchor="middle">Response Time (ms)</text>"##,
+                40.0 + chart_w / 2.0,
+                chart_h + 45.0
+            ));
+            svg.push_str("</svg>");
+            (svg, true)
+        } else {
+            (String::from("<p>No data available.</p>"), false)
+        };
+        let _ = histogram_buckets_exist;
+
+        // Status code bar chart SVG
+        let status_svg = if !status_entries.is_empty() {
+            let max_count = status_entries.iter().map(|&(_, c)| c).max().unwrap_or(1);
+            let chart_w = 400.0f64;
+            let chart_h = 200.0f64;
+            let bar_w = chart_w / status_entries.len() as f64;
+            let mut svg = format!(
+                r#"<svg viewBox="0 0 {vw} {vh}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:500px">"#,
+                vw = chart_w + 60.0,
+                vh = chart_h + 60.0
+            );
+            for (i, &(code, count)) in status_entries.iter().enumerate() {
+                let bar_h = if max_count > 0 {
+                    (count as f64 / max_count as f64) * chart_h
+                } else {
+                    0.0
+                };
+                let x = 40.0 + i as f64 * bar_w;
+                let y = chart_h - bar_h + 10.0;
+                let color = if code < 300 {
+                    "#22c55e"
+                } else if code < 400 {
+                    "#eab308"
+                } else if code < 500 {
+                    "#f97316"
+                } else {
+                    "#ef4444"
+                };
+                svg.push_str(&format!(
+                    r#"<rect x="{x:.1}" y="{y:.1}" width="{bw:.1}" height="{bh:.1}" fill="{color}" rx="2"><title>{code}: {count}</title></rect>"#,
+                    x = x,
+                    y = y,
+                    bw = (bar_w - 4.0).max(4.0),
+                    bh = bar_h,
+                    color = color,
+                    code = code,
+                    count = count
+                ));
+                // Count label above bar
+                svg.push_str(&format!(
+                    r##"<text x="{x:.1}" y="{y:.1}" font-size="11" fill="#334155" text-anchor="middle" font-weight="600">{count}</text>"##,
+                    x = x + (bar_w - 4.0).max(4.0) / 2.0,
+                    y = y - 4.0,
+                    count = count
+                ));
+                // Code label below
+                svg.push_str(&format!(
+                    r##"<text x="{x:.1}" y="{y}" font-size="11" fill="#64748b" text-anchor="middle">{code}</text>"##,
+                    x = x + (bar_w - 4.0).max(4.0) / 2.0,
+                    y = chart_h + 28.0,
+                    code = code
+                ));
+            }
+            svg.push_str(&format!(
+                r##"<text x="{}" y="{}" font-size="11" fill="#64748b" text-anchor="middle">Status Code</text>"##,
+                40.0 + chart_w / 2.0,
+                chart_h + 50.0
+            ));
+            svg.push_str("</svg>");
+            svg
+        } else {
+            String::from("<p>No data available.</p>")
+        };
+
+        // Build table rows
+        let mut table_rows = String::new();
+        for r in &self.responses {
+            let status_class = if r.status_code.is_success() {
+                "status-ok"
+            } else if r.status_code.is_redirection() {
+                "status-redirect"
+            } else {
+                "status-error"
+            };
+            table_rows.push_str(&format!(
+                "<tr><td class=\"url-cell\"><a href=\"{url}\" target=\"_blank\" rel=\"noopener\">{url}</a></td><td>{time}</td><td>{size}</td><td><span class=\"{cls}\">{code}</span></td></tr>\n",
+                url = html_escape(&r.url),
+                time = r.response_time.as_millis(),
+                size = utils::kb(r.response_size),
+                cls = status_class,
+                code = r.status_code.as_u16(),
+            ));
+        }
+
+        // Extract stat values for the summary cards
+        let rps = if total_time_secs > 0.0 {
+            format!("{:.2}", total_requests as f64 / total_time_secs)
+        } else {
+            "0".to_string()
+        };
+
+        let html = format!(
+            r##"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Siteprobe Report — {sitemap_url}</title>
+<style>
+*,*::before,*::after{{box-sizing:border-box}}
+body{{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f8fafc;color:#1e293b;line-height:1.6}}
+.container{{max-width:1200px;margin:0 auto;padding:24px 16px}}
+h1{{font-size:1.5rem;font-weight:700;margin:0 0 4px}}
+.subtitle{{color:#64748b;font-size:.875rem;margin:0 0 24px}}
+.cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:32px}}
+.card{{background:#fff;border-radius:10px;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
+.card .label{{font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:4px}}
+.card .value{{font-size:1.35rem;font-weight:700;color:#0f172a}}
+.section{{background:#fff;border-radius:10px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:24px}}
+.section h2{{margin:0 0 16px;font-size:1.1rem;font-weight:600}}
+.charts{{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px}}
+@media(max-width:768px){{.charts{{grid-template-columns:1fr}}}}
+table{{width:100%;border-collapse:collapse;font-size:.85rem}}
+th{{position:sticky;top:0;background:#f1f5f9;text-align:left;padding:10px 12px;font-weight:600;cursor:pointer;user-select:none;border-bottom:2px solid #e2e8f0}}
+th:hover{{background:#e2e8f0}}
+th::after{{content:'';display:inline-block;width:0;height:0;margin-left:6px;vertical-align:middle}}
+th.sort-asc::after{{border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:5px solid #475569}}
+th.sort-desc::after{{border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid #475569}}
+td{{padding:8px 12px;border-bottom:1px solid #f1f5f9}}
+tr:hover td{{background:#f8fafc}}
+.url-cell{{max-width:500px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+.url-cell a{{color:#4f46e5;text-decoration:none}}
+.url-cell a:hover{{text-decoration:underline}}
+.status-ok{{color:#16a34a;font-weight:600}}
+.status-redirect{{color:#ca8a04;font-weight:600}}
+.status-error{{color:#dc2626;font-weight:600}}
+.stats-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 24px}}
+.stat-row{{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9}}
+.stat-label{{color:#64748b;font-size:.85rem}}
+.stat-value{{font-weight:600;font-size:.85rem}}
+footer{{text-align:center;color:#94a3b8;font-size:.75rem;padding:24px 0}}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Siteprobe Report</h1>
+<p class="subtitle">{sitemap_url} &mdash; {elapsed}</p>
+
+<div class="cards">
+  <div class="card"><div class="label">Total Requests</div><div class="value">{total}</div></div>
+  <div class="card"><div class="label">Requests/sec</div><div class="value">{rps}</div></div>
+  <div class="card"><div class="label">Elapsed Time</div><div class="value">{elapsed}</div></div>
+  <div class="card"><div class="label">Concurrency</div><div class="value">{concurrency}</div></div>
+  <div class="card"><div class="label">Success Rate</div><div class="value">{success_rate}</div></div>
+  <div class="card"><div class="label">Error Rate</div><div class="value">{error_rate}</div></div>
+</div>
+
+<div class="section">
+<h2>Response Time Statistics</h2>
+<div class="stats-grid">
+{response_time_stats}
+</div>
+</div>
+
+<div class="section">
+<h2>Performance Statistics</h2>
+<div class="stats-grid">
+{performance_stats}
+</div>
+</div>
+
+<div class="charts">
+  <div class="section">
+    <h2>Response Time Distribution</h2>
+    {histogram_svg}
+  </div>
+  <div class="section">
+    <h2>Status Code Breakdown</h2>
+    {status_svg}
+  </div>
+</div>
+
+<div class="section">
+<h2>All Responses ({total})</h2>
+<div style="overflow-x:auto">
+<table id="responses">
+<thead>
+<tr>
+  <th data-col="0">URL</th>
+  <th data-col="1">Time (ms)</th>
+  <th data-col="2">Size</th>
+  <th data-col="3">Status</th>
+</tr>
+</thead>
+<tbody>
+{table_rows}
+</tbody>
+</table>
+</div>
+</div>
+
+<footer>Generated by Siteprobe {version}</footer>
+</div>
+<script>
+(function(){{
+  const table=document.getElementById('responses');
+  const headers=table.querySelectorAll('th');
+  let sortCol=-1,sortAsc=true;
+  headers.forEach(th=>{{
+    th.addEventListener('click',function(){{
+      const col=+this.dataset.col;
+      if(sortCol===col)sortAsc=!sortAsc;else{{sortCol=col;sortAsc=true}}
+      headers.forEach(h=>h.classList.remove('sort-asc','sort-desc'));
+      this.classList.add(sortAsc?'sort-asc':'sort-desc');
+      const tbody=table.querySelector('tbody');
+      const rows=Array.from(tbody.querySelectorAll('tr'));
+      rows.sort((a,b)=>{{
+        let av=a.children[col].textContent.trim();
+        let bv=b.children[col].textContent.trim();
+        if(col===1||col===3){{av=parseFloat(av)||0;bv=parseFloat(bv)||0}}
+        if(av<bv)return sortAsc?-1:1;
+        if(av>bv)return sortAsc?1:-1;
+        return 0;
+      }});
+      rows.forEach(r=>tbody.appendChild(r));
+    }});
+  }});
+}})();
+</script>
+</body>
+</html>"##,
+            sitemap_url = html_escape(&self.sitemap_url),
+            elapsed = format!("{:.2?}", self.total_time),
+            total = total_requests,
+            rps = rps,
+            concurrency = self.concurrency_limit,
+            success_rate = stats.status_code.0.iter().find(|e| e.json_label == "successRatePercentage").map(|e| e.value.clone()).unwrap_or_default(),
+            error_rate = stats.status_code.0.iter().find(|e| e.json_label == "errorRatePercentage").map(|e| e.value.clone()).unwrap_or_default(),
+            response_time_stats = stats.response_time.0.iter().map(|e| format!(
+                r#"<div class="stat-row"><span class="stat-label">{}</span><span class="stat-value">{}</span></div>"#,
+                html_escape(e.label), html_escape(&e.value)
+            )).collect::<Vec<_>>().join("\n"),
+            performance_stats = stats.performance.0.iter().map(|e| format!(
+                r#"<div class="stat-row"><span class="stat-label">{}</span><span class="stat-value">{}</span></div>"#,
+                html_escape(e.label), html_escape(&e.value)
+            )).collect::<Vec<_>>().join("\n"),
+            histogram_svg = histogram_svg,
+            status_svg = status_svg,
+            table_rows = table_rows,
+            version = env!("CARGO_PKG_VERSION"),
+        );
+
+        let mut file = File::create(report_path)?;
+        file.write_all(html.as_bytes())?;
+
+        if !options.json {
+            println!(
+                "\n🌐 The HTML report was written to {}",
+                style(report_path.display()).underlined().cyan()
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Determines the appropriate process exit code based on response results.
+    ///
+    /// - `0` — All URLs returned 2xx (success).
+    /// - `1` — One or more URLs returned 4xx/5xx (errors). Takes priority over slow.
+    /// - `2` — One or more URLs exceeded the slow threshold (when `--slow-threshold` is set).
+    pub fn exit_code(&self, slow_threshold: Option<f64>) -> ExitCode {
+        let has_errors = self
+            .responses
+            .iter()
+            .any(|r| r.status_code.is_client_error() || r.status_code.is_server_error());
+
+        if has_errors {
+            return ExitCode::from(1);
+        }
+
+        if let Some(threshold) = slow_threshold {
+            let has_slow = self
+                .responses
+                .iter()
+                .any(|r| r.response_time.as_secs_f64() > threshold);
+            if has_slow {
+                return ExitCode::from(2);
+            }
+        }
+
+        ExitCode::SUCCESS
     }
 
     // === Statistics ==============================================================================

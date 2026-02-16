@@ -1,8 +1,9 @@
-use crate::network::{get_url_content, get_url_response};
+use crate::network::get_url_response;
 use crate::options::Cli;
 use crate::report::Report;
 use crate::utils;
 use console::style;
+use flate2::read::GzDecoder;
 use futures::future::join_all;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
@@ -12,6 +13,7 @@ use quick_xml::Reader;
 use reqwest::Client;
 use std::error::Error;
 use std::fmt;
+use std::io::Read;
 use std::num::NonZeroU32;
 use std::sync::Arc;
 use std::time::Duration;
@@ -40,19 +42,56 @@ impl fmt::Display for SitemapType {
 // endregion
 
 // region: Functions
+
+/// Decompresses gzip-compressed bytes into a UTF-8 string.
+pub fn decompress_gzip(bytes: &[u8]) -> Result<String, Box<dyn Error>> {
+    let mut decoder = GzDecoder::new(bytes);
+    let mut decompressed = String::new();
+    decoder.read_to_string(&mut decompressed)?;
+    Ok(decompressed)
+}
+
+/// Checks if the content is gzip-compressed, either by URL suffix
+/// or by inspecting the gzip magic bytes (0x1f, 0x8b).
+pub fn is_gzip_content(url: &str, bytes: &[u8]) -> bool {
+    if url.ends_with(".gz") {
+        return true;
+    }
+    // Check for gzip magic number
+    bytes.len() >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b
+}
+
+/// Fetches a sitemap URL, automatically decompressing gzip content if detected.
+async fn get_sitemap_content(
+    url: &str,
+    client: &Client,
+) -> Result<String, Box<dyn Error>> {
+    let response = client.get(url).send().await?.error_for_status()?;
+    let bytes = response.bytes().await?;
+
+    if is_gzip_content(url, &bytes) {
+        decompress_gzip(&bytes)
+    } else {
+        Ok(String::from_utf8(bytes.to_vec())?)
+    }
+}
+
 pub async fn get_sitemap_urls(
     sitemap_url: &str,
     client: &Client,
+    quiet: bool,
 ) -> Result<Vec<String>, Box<dyn Error>> {
-    let content = match get_url_content(sitemap_url, client).await {
+    let content = match get_sitemap_content(sitemap_url, client).await {
         Ok(content) => content,
         Err(e) => {
-            return Err(format!("Unable to fetch sitemap: {}", Box::new(e)).into());
+            return Err(format!("Unable to fetch sitemap: {}", e).into());
         }
     };
 
     let sitemap_type = identify_sitemap_type(&content);
-    println!("{} 🔎 Fetch {}...", style("[1/3]").dim(), sitemap_type);
+    if !quiet {
+        println!("{} 🔎 Fetch {}...", style("[1/3]").dim(), sitemap_type);
+    }
 
     if sitemap_type == SitemapType::Unknown {
         return Err(format!("The sitemap does not contain any URLs: {}", sitemap_url).into());
@@ -62,14 +101,16 @@ pub async fn get_sitemap_urls(
     // In that case, retrieve the urls from all those sitemaps.
     let mut urls = Vec::new();
 
-    println!(
-        "{} 🚚 Collect all URLs from sitemap...",
-        style("[2/3]").dim()
-    );
+    if !quiet {
+        println!(
+            "{} 🚚 Collect all URLs from sitemap...",
+            style("[2/3]").dim()
+        );
+    }
     if sitemap_type == SitemapType::SitemapIndex {
         let sitemap_urls = extract_sitemap_urls(&content);
         for sitemap_url in sitemap_urls {
-            match get_url_content(&sitemap_url, client).await {
+            match get_sitemap_content(&sitemap_url, client).await {
                 Ok(content) => {
                     urls.extend(extract_sitemap_urls(&content));
                 }
@@ -178,6 +219,9 @@ pub async fn fetch_and_generate_report(
 
     // Setup progress bars.
     let wrapper_pb = indicatif::MultiProgress::new();
+    if options.json {
+        wrapper_pb.set_draw_target(indicatif::ProgressDrawTarget::hidden());
+    }
     let loading_pb = wrapper_pb.add(indicatif::ProgressBar::new(urls.len() as u64));
     loading_pb.set_style(
         indicatif::ProgressStyle::default_bar()
@@ -188,6 +232,8 @@ pub async fn fetch_and_generate_report(
             .unwrap()
             .progress_chars("■┄"),
     );
+
+    let retries = options.retries;
 
     let fetches = urls.iter().map(|u| {
         let semaphore = Arc::clone(&semaphore);
@@ -227,7 +273,30 @@ pub async fn fetch_and_generate_report(
 
             line_pb.set_message(format!("Fetching: {}", utils::truncate_message(&url, 80)));
             line_pb.enable_steady_tick(Duration::from_millis(100));
-            let result = get_url_response(&url, &client, &output_dir).await;
+
+            let mut result = get_url_response(&url, &client, &output_dir).await;
+
+            // Retry logic: retry on network errors or 5xx status codes
+            for attempt in 1..=retries {
+                let should_retry = match &result {
+                    Ok(resp) => resp.status_code.is_server_error(),
+                    Err(_) => true,
+                };
+
+                if !should_retry {
+                    break;
+                }
+
+                line_pb.set_message(format!(
+                    "Retrying ({}/{}): {}",
+                    attempt,
+                    retries,
+                    utils::truncate_message(&url, 70)
+                ));
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                result = get_url_response(&url, &client, &output_dir).await;
+            }
+
             line_pb.finish_and_clear();
             loading_pb.inc(1);
             result
