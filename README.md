@@ -24,13 +24,29 @@ features such as authentication, concurrency control, caching bypass, and more.
 
 ## Installation
 
-You can install Siteprobe using Cargo:
+### Run without installing
 
 ```sh
+uvx siteprobe https://example.com/sitemap.xml
+# or
+pipx run siteprobe https://example.com/sitemap.xml
+```
+
+### Install via package manager
+
+```sh
+# Homebrew (macOS/Linux)
+brew install bartTC/siteprobe/siteprobe
+
+# pip / pipx
+pip install siteprobe
+pipx install siteprobe
+
+# Cargo
 cargo install siteprobe
 ```
 
-Alternatively, build from source:
+### Build from source
 
 ```sh
 git clone https://github.com/bartTC/siteprobe.git
