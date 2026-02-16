@@ -62,10 +62,7 @@ pub fn is_gzip_content(url: &str, bytes: &[u8]) -> bool {
 }
 
 /// Fetches a sitemap URL, automatically decompressing gzip content if detected.
-async fn get_sitemap_content(
-    url: &str,
-    client: &Client,
-) -> Result<String, Box<dyn Error>> {
+async fn get_sitemap_content(url: &str, client: &Client) -> Result<String, Box<dyn Error>> {
     let response = client.get(url).send().await?.error_for_status()?;
     let bytes = response.bytes().await?;
 

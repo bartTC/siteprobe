@@ -128,7 +128,10 @@ fn parse_slow_threshold(value: &str) -> Result<f64, String> {
 }
 
 #[derive(Debug, Parser)]
-#[command(term_width = 80, version, after_help = "\
+#[command(
+    term_width = 80,
+    version,
+    after_help = "\
 EXIT CODES:\n\
     0  All URLs returned 2xx (success)\n\
     1  One or more URLs returned 4xx/5xx or failed\n\
@@ -306,10 +309,7 @@ impl ConfigFile {
         let config_path = match path {
             Some(p) => {
                 if !p.exists() {
-                    return Err(format!(
-                        "Config file '{}' not found.",
-                        p.display()
-                    ));
+                    return Err(format!("Config file '{}' not found.", p.display()));
                 }
                 p.clone()
             }
@@ -322,10 +322,20 @@ impl ConfigFile {
             }
         };
 
-        let contents = fs::read_to_string(&config_path)
-            .map_err(|e| format!("Failed to read config file '{}': {}", config_path.display(), e))?;
-        let config: ConfigFile = toml::from_str(&contents)
-            .map_err(|e| format!("Failed to parse config file '{}': {}", config_path.display(), e))?;
+        let contents = fs::read_to_string(&config_path).map_err(|e| {
+            format!(
+                "Failed to read config file '{}': {}",
+                config_path.display(),
+                e
+            )
+        })?;
+        let config: ConfigFile = toml::from_str(&contents).map_err(|e| {
+            format!(
+                "Failed to parse config file '{}': {}",
+                config_path.display(),
+                e
+            )
+        })?;
         Ok(config)
     }
 }

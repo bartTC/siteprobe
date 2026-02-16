@@ -328,8 +328,14 @@ fn test_is_gzip_content_by_url_suffix() {
 #[test]
 fn test_is_gzip_content_by_magic_bytes() {
     // Gzip magic bytes: 0x1f, 0x8b
-    assert!(is_gzip_content("https://example.com/sitemap.xml", &[0x1f, 0x8b, 0x08]));
-    assert!(!is_gzip_content("https://example.com/sitemap.xml", &[0x3c, 0x3f]));
+    assert!(is_gzip_content(
+        "https://example.com/sitemap.xml",
+        &[0x1f, 0x8b, 0x08]
+    ));
+    assert!(!is_gzip_content(
+        "https://example.com/sitemap.xml",
+        &[0x3c, 0x3f]
+    ));
     assert!(!is_gzip_content("https://example.com/sitemap.xml", &[0x1f]));
     assert!(!is_gzip_content("https://example.com/sitemap.xml", &[]));
 }

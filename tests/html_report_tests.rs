@@ -243,10 +243,7 @@ async fn test_html_report_tilde_expansion() {
 
     // Use a tilde path; the CLI should expand ~ to the home directory.
     let home = std::env::var("HOME").expect("HOME not set");
-    let unique_name = format!(
-        "siteprobe_html_tilde_test_{}.html",
-        std::process::id()
-    );
+    let unique_name = format!("siteprobe_html_tilde_test_{}.html", std::process::id());
     let tilde_path = format!("~/{}", unique_name);
     let expanded_path = format!("{}/{}", home, unique_name);
 

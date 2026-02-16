@@ -41,7 +41,12 @@ headers = ["Authorization: Bearer token123", "X-Custom: value"]
     assert_eq!(config.report_path_html.as_deref(), Some("/tmp/report.html"));
     assert_eq!(
         config.headers.as_deref(),
-        Some(&["Authorization: Bearer token123".to_string(), "X-Custom: value".to_string()][..])
+        Some(
+            &[
+                "Authorization: Bearer token123".to_string(),
+                "X-Custom: value".to_string()
+            ][..]
+        )
     );
 }
 
@@ -235,10 +240,7 @@ fn test_cli_args_override_config_values() {
     // We parse from a fake arg vector. Note: apply_config uses arg_provided()
     // which checks std::env::args(), so we test the config values are set
     // when no CLI override is present.
-    let mut cli = Cli::parse_from([
-        "siteprobe",
-        "http://example.com/sitemap.xml",
-    ]);
+    let mut cli = Cli::parse_from(["siteprobe", "http://example.com/sitemap.xml"]);
 
     // Before applying config, concurrency_limit is the default (4)
     assert_eq!(cli.concurrency_limit, 4);

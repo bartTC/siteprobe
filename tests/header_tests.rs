@@ -14,10 +14,16 @@ async fn setup_mock_server() -> MockServer {
 fn run_siteprobe(sitemap_url: &str, extra_args: &[&str]) -> std::process::Output {
     let mut cmd = Command::new("cargo");
     cmd.args([
-        "run", "--quiet", "--", sitemap_url,
-        "--user-agent", "test-agent",
-        "--request-timeout", "10",
-        "--concurrency-limit", "1",
+        "run",
+        "--quiet",
+        "--",
+        sitemap_url,
+        "--user-agent",
+        "test-agent",
+        "--request-timeout",
+        "10",
+        "--concurrency-limit",
+        "1",
         "--json",
     ]);
     for arg in extra_args {
@@ -34,8 +40,7 @@ async fn test_custom_header_is_sent() {
     Mock::given(method("GET"))
         .and(path("/sitemap.xml"))
         .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_string(SITEMAP_XML.replace("{BASE}", &base)),
+            ResponseTemplate::new(200).set_body_string(SITEMAP_XML.replace("{BASE}", &base)),
         )
         .mount(&server)
         .await;
@@ -68,8 +73,7 @@ async fn test_multiple_custom_headers() {
     Mock::given(method("GET"))
         .and(path("/sitemap.xml"))
         .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_string(SITEMAP_XML.replace("{BASE}", &base)),
+            ResponseTemplate::new(200).set_body_string(SITEMAP_XML.replace("{BASE}", &base)),
         )
         .mount(&server)
         .await;
@@ -103,8 +107,7 @@ async fn test_header_overrides_basic_auth() {
     Mock::given(method("GET"))
         .and(path("/sitemap.xml"))
         .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_string(SITEMAP_XML.replace("{BASE}", &base)),
+            ResponseTemplate::new(200).set_body_string(SITEMAP_XML.replace("{BASE}", &base)),
         )
         .mount(&server)
         .await;
@@ -119,8 +122,10 @@ async fn test_header_overrides_basic_auth() {
     let output = run_siteprobe(
         &format!("{}/sitemap.xml", base),
         &[
-            "--basic-auth", "user:pass",
-            "-H", "Authorization: Bearer mytoken",
+            "--basic-auth",
+            "user:pass",
+            "-H",
+            "Authorization: Bearer mytoken",
         ],
     );
 
@@ -136,9 +141,12 @@ async fn test_header_overrides_basic_auth() {
 fn test_invalid_header_format_rejected() {
     let output = Command::new("cargo")
         .args([
-            "run", "--quiet", "--",
+            "run",
+            "--quiet",
+            "--",
             "https://example.com/sitemap.xml",
-            "-H", "NoColonHere",
+            "-H",
+            "NoColonHere",
         ])
         .output()
         .expect("Failed to execute");
@@ -159,9 +167,12 @@ fn test_invalid_header_format_rejected() {
 fn test_empty_header_name_rejected() {
     let output = Command::new("cargo")
         .args([
-            "run", "--quiet", "--",
+            "run",
+            "--quiet",
+            "--",
             "https://example.com/sitemap.xml",
-            "-H", ": value",
+            "-H",
+            ": value",
         ])
         .output()
         .expect("Failed to execute");

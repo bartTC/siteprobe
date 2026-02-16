@@ -630,15 +630,24 @@ async fn test_e2e_error_and_slow_responses() {
     let sitemap_url = format!("{}/sitemap.xml", mock_server.uri());
     let output = Command::new("cargo")
         .args([
-            "run", "--quiet", "--",
+            "run",
+            "--quiet",
+            "--",
             &sitemap_url,
-            "--user-agent", "test-agent",
-            "--request-timeout", "10",
-            "--concurrency-limit", "1",
-            "--slow-threshold", "1.0",
-            "--slow-num", "5",
-            "--report-path-json", json_report.to_str().unwrap(),
-            "--report-path-html", html_report.to_str().unwrap(),
+            "--user-agent",
+            "test-agent",
+            "--request-timeout",
+            "10",
+            "--concurrency-limit",
+            "1",
+            "--slow-threshold",
+            "1.0",
+            "--slow-num",
+            "5",
+            "--report-path-json",
+            json_report.to_str().unwrap(),
+            "--report-path-html",
+            html_report.to_str().unwrap(),
         ])
         .output()
         .expect("Failed to execute siteprobe binary");
@@ -685,8 +694,14 @@ async fn test_e2e_error_and_slow_responses() {
     // HTML report should exist and contain status class markup
     assert!(html_report.exists(), "HTML report should be created");
     let html_content = fs::read_to_string(&html_report).expect("Failed to read HTML report");
-    assert!(html_content.contains("status-error"), "HTML should contain error status class");
-    assert!(html_content.contains("status-ok"), "HTML should contain ok status class");
+    assert!(
+        html_content.contains("status-error"),
+        "HTML should contain error status class"
+    );
+    assert!(
+        html_content.contains("status-ok"),
+        "HTML should contain ok status class"
+    );
 }
 
 #[tokio::test]
@@ -709,10 +724,7 @@ async fn test_e2e_redirect_responses() {
 
     Mock::given(method("GET"))
         .and(path("/redirect"))
-        .respond_with(
-            ResponseTemplate::new(301)
-                .append_header("Location", "/destination"),
-        )
+        .respond_with(ResponseTemplate::new(301).append_header("Location", "/destination"))
         .mount(&mock_server)
         .await;
 
@@ -722,12 +734,18 @@ async fn test_e2e_redirect_responses() {
     let sitemap_url = format!("{}/sitemap.xml", mock_server.uri());
     let output = Command::new("cargo")
         .args([
-            "run", "--quiet", "--",
+            "run",
+            "--quiet",
+            "--",
             &sitemap_url,
-            "--user-agent", "test-agent",
-            "--request-timeout", "10",
-            "--concurrency-limit", "1",
-            "--report-path-html", html_report.to_str().unwrap(),
+            "--user-agent",
+            "test-agent",
+            "--request-timeout",
+            "10",
+            "--concurrency-limit",
+            "1",
+            "--report-path-html",
+            html_report.to_str().unwrap(),
         ])
         .output()
         .expect("Failed to execute siteprobe binary");
@@ -742,5 +760,8 @@ async fn test_e2e_redirect_responses() {
     // HTML report should have redirect status class
     assert!(html_report.exists(), "HTML report should be created");
     let html_content = fs::read_to_string(&html_report).expect("Failed to read HTML report");
-    assert!(html_content.contains("status-redirect"), "HTML should contain redirect status class");
+    assert!(
+        html_content.contains("status-redirect"),
+        "HTML should contain redirect status class"
+    );
 }

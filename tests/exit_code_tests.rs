@@ -34,19 +34,13 @@ fn exit_code_0_when_all_2xx() {
 
 #[test]
 fn exit_code_1_when_any_4xx() {
-    let report = make_report(vec![
-        make_response(200, 100),
-        make_response(404, 200),
-    ]);
+    let report = make_report(vec![make_response(200, 100), make_response(404, 200)]);
     assert_eq!(report.exit_code(None), 1u8.into());
 }
 
 #[test]
 fn exit_code_1_when_any_5xx() {
-    let report = make_report(vec![
-        make_response(200, 100),
-        make_response(500, 200),
-    ]);
+    let report = make_report(vec![make_response(200, 100), make_response(500, 200)]);
     assert_eq!(report.exit_code(None), 1u8.into());
 }
 

@@ -143,9 +143,12 @@ fn test_parse_rate_limit_empty_time() {
 fn test_slow_threshold_invalid_via_cli() {
     let output = Command::new("cargo")
         .args([
-            "run", "--quiet", "--",
+            "run",
+            "--quiet",
+            "--",
             "http://example.com/sitemap.xml",
-            "-s", "notanumber",
+            "-s",
+            "notanumber",
         ])
         .output()
         .expect("Failed to execute");
@@ -163,9 +166,12 @@ fn test_slow_threshold_invalid_via_cli() {
 fn test_slow_threshold_negative_via_cli() {
     let output = Command::new("cargo")
         .args([
-            "run", "--quiet", "--",
+            "run",
+            "--quiet",
+            "--",
             "http://example.com/sitemap.xml",
-            "-s", "-1.0",
+            "-s",
+            "-1.0",
         ])
         .output()
         .expect("Failed to execute");

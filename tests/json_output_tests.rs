@@ -88,7 +88,10 @@ async fn test_json_flag_produces_valid_json_on_stdout() {
         serde_json::from_str(&stdout).expect("stdout should be valid JSON");
 
     // Verify top-level structure
-    assert!(json.get("config").is_some(), "JSON should have 'config' key");
+    assert!(
+        json.get("config").is_some(),
+        "JSON should have 'config' key"
+    );
     assert!(
         json.get("statistics").is_some(),
         "JSON should have 'statistics' key"
@@ -99,11 +102,10 @@ async fn test_json_flag_produces_valid_json_on_stdout() {
     );
 
     // Verify responses array has entries
-    let responses = json["responses"].as_array().expect("responses should be an array");
-    assert!(
-        !responses.is_empty(),
-        "responses array should not be empty"
-    );
+    let responses = json["responses"]
+        .as_array()
+        .expect("responses should be an array");
+    assert!(!responses.is_empty(), "responses array should not be empty");
 
     // Verify each response has the expected fields
     for resp in responses {
@@ -122,10 +124,7 @@ async fn test_json_flag_produces_valid_json_on_stdout() {
         );
 
         // statusCode should be a number
-        assert!(
-            resp["statusCode"].is_u64(),
-            "statusCode should be a number"
-        );
+        assert!(resp["statusCode"].is_u64(), "statusCode should be a number");
     }
 }
 
@@ -194,7 +193,10 @@ async fn test_json_flag_combined_with_report_path_json() {
         serde_json::from_str(&stdout).expect("stdout should be valid JSON");
 
     // File should also exist and be valid JSON
-    assert!(json_report_path.exists(), "JSON report file should be created");
+    assert!(
+        json_report_path.exists(),
+        "JSON report file should be created"
+    );
     let file_content = fs::read_to_string(&json_report_path).expect("Failed to read JSON report");
     let file_json: serde_json::Value =
         serde_json::from_str(&file_content).expect("file JSON should be valid");
@@ -208,7 +210,11 @@ async fn test_json_flag_combined_with_report_path_json() {
 
     // Both should have config, statistics, responses
     for key in &["config", "statistics", "responses"] {
-        assert!(stdout_json.get(*key).is_some(), "stdout JSON missing '{}'", key);
+        assert!(
+            stdout_json.get(*key).is_some(),
+            "stdout JSON missing '{}'",
+            key
+        );
         assert!(file_json.get(*key).is_some(), "file JSON missing '{}'", key);
     }
 }
@@ -231,16 +237,37 @@ async fn test_json_output_structure_fields() {
 
     // Verify config fields
     let config = &json["config"];
-    assert!(config["sitemapUrl"].is_string(), "config.sitemapUrl should be a string");
-    assert!(config["concurrencyLimit"].is_u64(), "config.concurrencyLimit should be a number");
-    assert!(config["elapsedTime"].is_u64(), "config.elapsedTime should be a number");
-    assert!(config["bypassCaching"].is_boolean(), "config.bypassCaching should be a boolean");
+    assert!(
+        config["sitemapUrl"].is_string(),
+        "config.sitemapUrl should be a string"
+    );
+    assert!(
+        config["concurrencyLimit"].is_u64(),
+        "config.concurrencyLimit should be a number"
+    );
+    assert!(
+        config["elapsedTime"].is_u64(),
+        "config.elapsedTime should be a number"
+    );
+    assert!(
+        config["bypassCaching"].is_boolean(),
+        "config.bypassCaching should be a boolean"
+    );
 
     // Verify statistics sub-objects exist
     let stats = &json["statistics"];
-    assert!(stats.get("performance").is_some(), "statistics should have 'performance'");
-    assert!(stats.get("responseTime").is_some(), "statistics should have 'responseTime'");
-    assert!(stats.get("statusCode").is_some(), "statistics should have 'statusCode'");
+    assert!(
+        stats.get("performance").is_some(),
+        "statistics should have 'performance'"
+    );
+    assert!(
+        stats.get("responseTime").is_some(),
+        "statistics should have 'responseTime'"
+    );
+    assert!(
+        stats.get("statusCode").is_some(),
+        "statistics should have 'statusCode'"
+    );
 
     // Verify responses array entries have correct types
     let responses = json["responses"].as_array().unwrap();

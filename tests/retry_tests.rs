@@ -63,7 +63,9 @@ async fn test_retries_zero_no_retry_on_500() {
     let json: serde_json::Value =
         serde_json::from_str(&stdout).expect("Output should be valid JSON");
 
-    let responses = json["responses"].as_array().expect("responses should be an array");
+    let responses = json["responses"]
+        .as_array()
+        .expect("responses should be an array");
     assert_eq!(responses.len(), 1, "Should have exactly 1 response");
     assert_eq!(
         responses[0]["statusCode"].as_u64().unwrap(),
@@ -110,7 +112,9 @@ async fn test_retries_two_succeeds_after_failures() {
     let json: serde_json::Value =
         serde_json::from_str(&stdout).expect("Output should be valid JSON");
 
-    let responses = json["responses"].as_array().expect("responses should be an array");
+    let responses = json["responses"]
+        .as_array()
+        .expect("responses should be an array");
     assert_eq!(responses.len(), 1, "Should have exactly 1 response");
     assert_eq!(
         responses[0]["statusCode"].as_u64().unwrap(),
@@ -150,7 +154,9 @@ async fn test_no_retry_on_4xx() {
     let json: serde_json::Value =
         serde_json::from_str(&stdout).expect("Output should be valid JSON");
 
-    let responses = json["responses"].as_array().expect("responses should be an array");
+    let responses = json["responses"]
+        .as_array()
+        .expect("responses should be an array");
     assert_eq!(responses.len(), 1);
     assert_eq!(
         responses[0]["statusCode"].as_u64().unwrap(),
