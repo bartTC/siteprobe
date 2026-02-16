@@ -1,4 +1,5 @@
 use siteprobe::options::parse_rate_limit;
+use std::process::Command;
 
 #[test]
 fn test_parse_rate_limit_valid_inputs() {
@@ -128,5 +129,52 @@ fn test_parse_rate_limit_at_least_one_per_minute() {
     assert_eq!(
         result.err().unwrap(),
         "Ensure the calculated rate is ≥ 1 per minute."
+    );
+}
+
+#[test]
+fn test_parse_rate_limit_empty_time() {
+    let result = parse_rate_limit("100/");
+    assert!(result.is_err());
+    assert_eq!(result.err().unwrap(), "Time value cannot be empty");
+}
+
+#[test]
+fn test_slow_threshold_invalid_via_cli() {
+    let output = Command::new("cargo")
+        .args([
+            "run", "--quiet", "--",
+            "http://example.com/sitemap.xml",
+            "-s", "notanumber",
+        ])
+        .output()
+        .expect("Failed to execute");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("not a valid number"),
+        "Expected 'not a valid number' error, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_slow_threshold_negative_via_cli() {
+    let output = Command::new("cargo")
+        .args([
+            "run", "--quiet", "--",
+            "http://example.com/sitemap.xml",
+            "-s", "-1.0",
+        ])
+        .output()
+        .expect("Failed to execute");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("greater than or equal to 0.0") || stderr.contains("unexpected argument"),
+        "Expected validation error, got: {}",
+        stderr
     );
 }

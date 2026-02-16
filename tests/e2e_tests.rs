@@ -1,6 +1,6 @@
 use std::fs;
-use std::path::PathBuf;
 use std::process::Command;
+use std::time::Duration;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -572,4 +572,175 @@ async fn test_e2e_invalid_sitemap_index() {
         0,
         "JSON should have 0 responses"
     );
+}
+
+#[tokio::test]
+async fn test_e2e_error_and_slow_responses() {
+    let mock_server = MockServer::start().await;
+
+    let sitemap_xml = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{base}/ok</loc></url>
+  <url><loc>{base}/not-found</loc></url>
+  <url><loc>{base}/error</loc></url>
+  <url><loc>{base}/slow</loc></url>
+</urlset>"#,
+        base = mock_server.uri()
+    );
+
+    Mock::given(method("GET"))
+        .and(path("/sitemap.xml"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(sitemap_xml))
+        .mount(&mock_server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/ok"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("OK"))
+        .mount(&mock_server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/not-found"))
+        .respond_with(ResponseTemplate::new(404).set_body_string("Not Found"))
+        .mount(&mock_server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/error"))
+        .respond_with(ResponseTemplate::new(500).set_body_string("Internal Server Error"))
+        .mount(&mock_server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/slow"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string("Slow page")
+                .set_delay(Duration::from_millis(1100)),
+        )
+        .mount(&mock_server)
+        .await;
+
+    let temp_dir = temp_dir("error_slow");
+    let json_report = temp_dir.path().join("report.json");
+    let html_report = temp_dir.path().join("report.html");
+
+    let sitemap_url = format!("{}/sitemap.xml", mock_server.uri());
+    let output = Command::new("cargo")
+        .args([
+            "run", "--quiet", "--",
+            &sitemap_url,
+            "--user-agent", "test-agent",
+            "--request-timeout", "10",
+            "--concurrency-limit", "1",
+            "--slow-threshold", "1.0",
+            "--slow-num", "5",
+            "--report-path-json", json_report.to_str().unwrap(),
+            "--report-path-html", html_report.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute siteprobe binary");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Exit code should be 1 (error responses present)
+    assert!(
+        !output.status.success(),
+        "Should exit with non-zero due to error responses. stdout: {}",
+        stdout
+    );
+
+    // Should display error responses section
+    assert!(
+        stdout.contains("Error Responses") || stdout.contains("404") || stdout.contains("500"),
+        "Output should mention error responses. stdout: {}",
+        stdout
+    );
+
+    // Should display slow responses section
+    assert!(
+        stdout.contains("Slow Responses"),
+        "Output should show slow responses section. stdout: {}",
+        stdout
+    );
+
+    // JSON report should exist and contain mixed status codes
+    assert!(json_report.exists(), "JSON report should be created");
+    let json_content = fs::read_to_string(&json_report).expect("Failed to read JSON report");
+    let json: serde_json::Value =
+        serde_json::from_str(&json_content).expect("JSON should be valid");
+    let responses = json["responses"].as_array().unwrap();
+    assert_eq!(responses.len(), 4, "Should have 4 responses");
+
+    let status_codes: Vec<u64> = responses
+        .iter()
+        .map(|r| r["statusCode"].as_u64().unwrap())
+        .collect();
+    assert!(status_codes.contains(&200), "Should have a 200 response");
+    assert!(status_codes.contains(&404), "Should have a 404 response");
+    assert!(status_codes.contains(&500), "Should have a 500 response");
+
+    // HTML report should exist and contain status class markup
+    assert!(html_report.exists(), "HTML report should be created");
+    let html_content = fs::read_to_string(&html_report).expect("Failed to read HTML report");
+    assert!(html_content.contains("status-error"), "HTML should contain error status class");
+    assert!(html_content.contains("status-ok"), "HTML should contain ok status class");
+}
+
+#[tokio::test]
+async fn test_e2e_redirect_responses() {
+    let mock_server = MockServer::start().await;
+
+    let sitemap_xml = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{base}/redirect</loc></url>
+</urlset>"#,
+        base = mock_server.uri()
+    );
+
+    Mock::given(method("GET"))
+        .and(path("/sitemap.xml"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(sitemap_xml))
+        .mount(&mock_server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/redirect"))
+        .respond_with(
+            ResponseTemplate::new(301)
+                .append_header("Location", "/destination"),
+        )
+        .mount(&mock_server)
+        .await;
+
+    let temp_dir = temp_dir("redirect");
+    let html_report = temp_dir.path().join("report.html");
+
+    let sitemap_url = format!("{}/sitemap.xml", mock_server.uri());
+    let output = Command::new("cargo")
+        .args([
+            "run", "--quiet", "--",
+            &sitemap_url,
+            "--user-agent", "test-agent",
+            "--request-timeout", "10",
+            "--concurrency-limit", "1",
+            "--report-path-html", html_report.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute siteprobe binary");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Redirect Rate") && stdout.contains("100%"),
+        "Should show 100% redirect rate. stdout: {}",
+        stdout
+    );
+
+    // HTML report should have redirect status class
+    assert!(html_report.exists(), "HTML report should be created");
+    let html_content = fs::read_to_string(&html_report).expect("Failed to read HTML report");
+    assert!(html_content.contains("status-redirect"), "HTML should contain redirect status class");
 }

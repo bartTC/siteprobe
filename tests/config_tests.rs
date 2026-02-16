@@ -21,6 +21,7 @@ retries = 3
 report_path = "/tmp/report.csv"
 report_path_json = "/tmp/report.json"
 report_path_html = "/tmp/report.html"
+headers = ["Authorization: Bearer token123", "X-Custom: value"]
 "#;
 
     let config: ConfigFile = toml::from_str(toml_str).expect("Failed to parse TOML");
@@ -38,6 +39,10 @@ report_path_html = "/tmp/report.html"
     assert_eq!(config.report_path.as_deref(), Some("/tmp/report.csv"));
     assert_eq!(config.report_path_json.as_deref(), Some("/tmp/report.json"));
     assert_eq!(config.report_path_html.as_deref(), Some("/tmp/report.html"));
+    assert_eq!(
+        config.headers.as_deref(),
+        Some(&["Authorization: Bearer token123".to_string(), "X-Custom: value".to_string()][..])
+    );
 }
 
 /// Test 2: ConfigFile::load() with an explicit path that exists.
@@ -128,7 +133,85 @@ fn test_cli_config_nonexistent_path_errors() {
     );
 }
 
-/// Test 6: CLI args override config file values.
+/// Test 6: apply_config merges all config file fields into CLI defaults.
+#[test]
+fn test_apply_config_all_fields() {
+    use clap::Parser;
+    use siteprobe::options::Cli;
+
+    let config = ConfigFile {
+        user_agent: Some("CustomBot/2.0".to_string()),
+        concurrency_limit: Some(20),
+        rate_limit: Some("200/1m".to_string()),
+        request_timeout: Some(45),
+        slow_threshold: Some(1.5),
+        slow_num: Some(25),
+        basic_auth: Some("admin:secret".to_string()),
+        follow_redirects: Some(true),
+        append_timestamp: Some(true),
+        retries: Some(5),
+        report_path: Some("/tmp/r.csv".to_string()),
+        report_path_json: Some("/tmp/r.json".to_string()),
+        report_path_html: Some("/tmp/r.html".to_string()),
+        headers: Some(vec!["X-Token: abc".to_string()]),
+    };
+
+    let mut cli = Cli::parse_from(["siteprobe", "http://example.com/sitemap.xml"]);
+    cli.apply_config(&config);
+
+    assert_eq!(cli.user_agent, "CustomBot/2.0");
+    assert_eq!(cli.concurrency_limit, 20);
+    assert_eq!(cli.rate_limit, Some(200));
+    assert_eq!(cli.request_timeout, 45);
+    assert_eq!(cli.slow_threshold, Some(1.5));
+    assert_eq!(cli.slow_num, 25);
+    assert_eq!(cli.basic_auth.as_deref(), Some("admin:secret"));
+    assert!(cli.follow_redirects);
+    assert!(cli.append_timestamp);
+    assert_eq!(cli.retries, 5);
+    assert!(cli.report_path.is_some());
+    assert!(cli.report_path_json.is_some());
+    assert!(cli.report_path_html.is_some());
+    assert_eq!(cli.headers, vec!["X-Token: abc".to_string()]);
+}
+
+/// Test 7: apply_config with invalid rate_limit logs warning but doesn't crash.
+#[test]
+fn test_apply_config_invalid_rate_limit() {
+    use clap::Parser;
+    use siteprobe::options::Cli;
+
+    let config = ConfigFile {
+        rate_limit: Some("invalid".to_string()),
+        ..ConfigFile::default()
+    };
+
+    let mut cli = Cli::parse_from(["siteprobe", "http://example.com/sitemap.xml"]);
+    cli.apply_config(&config);
+
+    // rate_limit should remain None since the config value was invalid
+    assert!(cli.rate_limit.is_none());
+}
+
+/// Test 8: apply_config with invalid header logs warning but doesn't crash.
+#[test]
+fn test_apply_config_invalid_header() {
+    use clap::Parser;
+    use siteprobe::options::Cli;
+
+    let config = ConfigFile {
+        headers: Some(vec!["NoColon".to_string(), "Valid: header".to_string()]),
+        ..ConfigFile::default()
+    };
+
+    let mut cli = Cli::parse_from(["siteprobe", "http://example.com/sitemap.xml"]);
+    cli.apply_config(&config);
+
+    // Only the valid header should be added
+    assert_eq!(cli.headers, vec!["Valid: header".to_string()]);
+}
+
+/// Test 9: CLI args override config file values.
 /// Config sets concurrency_limit=10, CLI passes --concurrency-limit 5, verify 5 wins.
 /// We use --json output to inspect the effective settings indirectly. Since we cannot
 /// directly inspect parsed options from outside, we verify via the --config flag being
