@@ -11,8 +11,6 @@ fn temp_dir(prefix: &str) -> tempfile::TempDir {
         .expect("Failed to create temp dir")
 }
 
-
-
 /// Helper to build common CLI arguments for E2E tests
 fn build_cli_args(
     sitemap_url: &str,

@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.2.2 (2026-02-16)
+
+- Downgraded Rust edition from 2024 to 2021 for compatibility with older Rust
+  toolchains (e.g., Cargo 1.75 shipped with Ubuntu). Replaced let chains and
+  adjusted never-type fallback usage to compile under edition 2021.
+- Switched TLS backend from OpenSSL to rustls. This eliminates the runtime
+  dependency on system OpenSSL libraries, fixing "libssl not found" errors
+  when installing via `uvx`/`pip` on Linux.
+
 ## v1.2.1 (2026-01-20)
 
 - Added Homebrew installation support (`brew install bartTC/siteprobe/siteprobe`).

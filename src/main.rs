@@ -27,10 +27,10 @@ async fn main() -> Result<ExitCode, Box<dyn Error>> {
     // Fetch all URLs from the sitemap.
     let urls = get_sitemap_urls(options.sitemap_url.as_str(), &client)
         .await
-        .map_err(|e| {
+        .unwrap_or_else(|e| {
             eprintln!("{} {}", style("[ERROR]").red(), e);
             std::process::exit(1);
-        })?;
+        });
 
     // Fetch URLs concurrently and generate a report.
     let report = fetch_and_generate_report(urls, &client, &options, &start_time).await?;

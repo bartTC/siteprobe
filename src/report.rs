@@ -1,4 +1,4 @@
-use crate::metrics::{CLEAN_FORMAT, Entry, Metrics};
+use crate::metrics::{Entry, Metrics, CLEAN_FORMAT};
 use crate::options::Cli;
 use crate::utils;
 use console::style;
@@ -278,10 +278,11 @@ impl Report {
                 redirect_count += 1;
             }
 
-            if let Some(threshold) = slow_threshold
-                && response.response_time.as_secs_f64() > threshold {
+            if let Some(threshold) = slow_threshold {
+                if response.response_time.as_secs_f64() > threshold {
                     slow_count += 1;
                 }
+            }
         }
 
         let success_rate = if total_requests > 0 {
@@ -498,4 +499,3 @@ impl Report {
         responses
     }
 }
- 

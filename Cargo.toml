@@ -1,8 +1,8 @@
 [package]
 name = "siteprobe"
-version = "1.2.1"
+version = "1.2.2"
 license = "MIT"
-edition = "2024"
+edition = "2021"
 authors = ["Martin Mahner <martin@elephant.house>"]
 description = "CLI tool to fetch URLs from sitemap.xml, check their existence, and generate performance reports"
 repository = "https://github.com/bartTC/siteprobe"
@@ -35,7 +35,7 @@ once_cell = "1.20.3"
 prettytable = "0.10.0"
 quick-xml = "0.37.2"
 rand = "0.9.0"
-reqwest = { version = "0.12.12", features = ["json"] }
+reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"] }
 tokio = { version = "1.43.0", features = ["full"] }
 unicode-segmentation = "1.12.0"
 url = "2.5.4"

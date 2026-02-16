@@ -1,5 +1,5 @@
 use crate::utils::validate_basic_auth;
-use clap::{Parser, ValueHint, value_parser};
+use clap::{value_parser, Parser, ValueHint};
 use std::fs;
 use std::path::PathBuf;
 use url::Url;

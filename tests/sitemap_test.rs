@@ -132,13 +132,25 @@ fn test_extract_sitemap_urls_valid() {
    </url>
 </urlset>"#;
     let urls = extract_sitemap_urls(xml);
-    
+
     assert_eq!(urls.len(), 5);
     assert_eq!(urls[0], "http://www.example.com/");
-    assert_eq!(urls[1], "http://www.example.com/catalog?item=12&desc=vacation_hawaii");
-    assert_eq!(urls[2], "http://www.example.com/catalog?item=73&desc=vacation_new_zealand");
-    assert_eq!(urls[3], "http://www.example.com/catalog?item=74&desc=vacation_newfoundland");
-    assert_eq!(urls[4], "http://www.example.com/catalog?item=83&desc=vacation_usa");
+    assert_eq!(
+        urls[1],
+        "http://www.example.com/catalog?item=12&desc=vacation_hawaii"
+    );
+    assert_eq!(
+        urls[2],
+        "http://www.example.com/catalog?item=73&desc=vacation_new_zealand"
+    );
+    assert_eq!(
+        urls[3],
+        "http://www.example.com/catalog?item=74&desc=vacation_newfoundland"
+    );
+    assert_eq!(
+        urls[4],
+        "http://www.example.com/catalog?item=83&desc=vacation_usa"
+    );
 }
 
 #[test]
@@ -158,7 +170,7 @@ fn test_extract_sitemap_urls_from_index() {
    </sitemap>
 </sitemapindex>"#;
     let urls = extract_sitemap_urls(xml);
-    
+
     assert_eq!(urls.len(), 3);
     assert_eq!(urls[0], "http://www.example.com/sitemap1.xml");
     assert_eq!(urls[1], "http://www.example.com/sitemap2.xml");
@@ -181,7 +193,7 @@ fn test_extract_sitemap_urls_with_escapes() {
    </url>
 </urlset>"#;
     let urls = extract_sitemap_urls(xml);
-    
+
     assert_eq!(urls.len(), 3);
     // XML entities should be unescaped
     assert_eq!(urls[0], "http://www.example.com/page?id=1&category=test");
@@ -195,7 +207,7 @@ fn test_extract_sitemap_urls_empty() {
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 </urlset>"#;
     let urls = extract_sitemap_urls(xml);
-    
+
     assert_eq!(urls.len(), 0);
 }
 
@@ -203,7 +215,7 @@ fn test_extract_sitemap_urls_empty() {
 fn test_extract_sitemap_urls_malformed() {
     let xml = "This is not XML at all";
     let urls = extract_sitemap_urls(xml);
-    
+
     assert_eq!(urls.len(), 0);
 }
 
@@ -211,7 +223,7 @@ fn test_extract_sitemap_urls_malformed() {
 fn test_extract_sitemap_urls_empty_string() {
     let xml = "";
     let urls = extract_sitemap_urls(xml);
-    
+
     assert_eq!(urls.len(), 0);
 }
 
@@ -224,7 +236,7 @@ fn test_extract_sitemap_urls_no_loc_tags() {
    </url>
 </urlset>"#;
     let urls = extract_sitemap_urls(xml);
-    
+
     assert_eq!(urls.len(), 0);
 }
 
@@ -244,7 +256,7 @@ fn test_extract_sitemap_urls_nested_structure() {
    </url>
 </urlset>"#;
     let urls = extract_sitemap_urls(xml);
-    
+
     assert_eq!(urls.len(), 2);
     assert_eq!(urls[0], "http://www.example.com/page1");
     assert_eq!(urls[1], "http://www.example.com/page2");
@@ -299,4 +311,3 @@ fn test_extract_sitemap_urls_incomplete_xml() {
     let urls = extract_sitemap_urls(xml);
     assert_eq!(urls.len(), 0);
 }
-
