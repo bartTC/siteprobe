@@ -16,6 +16,10 @@
 - Added `--report-path-html` option to generate a self-contained HTML report
   with summary statistics, response time distribution histogram, status code
   breakdown chart, and a sortable table of all responses.
+- Added `-H` / `--header` option to send custom headers with every request.
+  Supports any `Name: Value` format and can be repeated for multiple headers.
+  Useful for token-based auth, session cookies, API keys, etc. Also supported
+  in the `.siteprobe.toml` config file via the `headers` array field.
 - Added `.siteprobe.toml` config file support. Options can be set in a TOML
   file (loaded from the current directory by default, or via `--config`).
   CLI arguments take priority over config file values.

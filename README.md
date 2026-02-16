@@ -75,6 +75,9 @@ Arguments:
 Options:
       --basic-auth <BASIC_AUTH>
           Basic authentication credentials in the format `username:password`
+  -H, --header <HEADERS>
+          Custom header to include in each request (format: 'Name: Value'). Can
+          be specified multiple times.
   -c, --concurrency-limit <CONCURRENCY_LIMIT>
           Maximum number of concurrent requests allowed [default: 4]
   -l, --rate-limit <RATE_LIMIT>
@@ -90,11 +93,13 @@ Options:
           File path for storing the generated `report.csv`
   -j, --report-path-json <REPORT_PATH_JSON>
           File path for storing the generated `report.json`
+      --report-path-html <REPORT_PATH_HTML>
+          File path for storing the generated `report.html`
   -t, --request-timeout <REQUEST_TIMEOUT>
           Default timeout (in seconds) for each request [default: 10]
       --user-agent <USER_AGENT>
           Custom User-Agent header to be used in requests [default: "Mozilla/5.0
-          (compatible; Siteprobe/0.5.0)"]
+          (compatible; Siteprobe/1.3.0)"]
       --slow-num <SLOW_NUM>
           Limit the number of slow documents displayed in the report. [default:
           100]
@@ -107,9 +112,52 @@ Options:
           HTTP redirects (up to 10 by default). Note that for security, Basic
           Authentication credentials are intentionally not forwarded during
           redirects to prevent unintended credential exposure.
+      --retries <RETRIES>
+          Number of retries for failed requests (network errors or 5xx
+          responses) [default: 0]
+      --json
+          Output the JSON report to stdout instead of the normal table output.
+          Suppresses all other console output for clean piping.
+      --config <CONFIG>
+          Path to a TOML config file. Defaults to `.siteprobe.toml` in the
+          current directory.
   -h, --help
           Print help
+  -V, --version
+          Print version
+
+EXIT CODES:
+0  All URLs returned 2xx (success)
+1  One or more URLs returned 4xx/5xx or failed
+2  One or more URLs exceeded the slow threshold (--slow-threshold)
 ```
+
+### Authentication & Custom Headers
+
+Siteprobe supports several ways to authenticate requests:
+
+```sh
+# Basic Authentication
+siteprobe https://example.com/sitemap.xml --basic-auth user:password
+
+# Bearer token (via custom header)
+siteprobe https://example.com/sitemap.xml -H "Authorization: Bearer <token>"
+
+# Send a session cookie
+siteprobe https://example.com/sitemap.xml -H "Cookie: sessionid=abc123def456"
+```
+
+You can combine multiple `-H` flags to send several custom headers at once:
+
+```sh
+siteprobe https://example.com/sitemap.xml \
+  -H "Authorization: Bearer <token>" \
+  -H "Cookie: sessionid=abc123" \
+  -H "X-Custom-Header: value"
+```
+
+If both `--basic-auth` and `-H "Authorization: ..."` are provided, the `-H` value
+takes precedence.
 
 ### Example Usage
 
