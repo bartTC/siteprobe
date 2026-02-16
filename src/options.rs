@@ -5,6 +5,18 @@ use std::fs;
 use std::path::PathBuf;
 use url::Url;
 
+/// Validates that a header string is in the format "Name: Value" with a non-empty name.
+pub fn validate_header(s: &str) -> Result<String, String> {
+    let Some(colon_pos) = s.find(':') else {
+        return Err("Header must be in the format 'Name: Value' (missing ':')".to_string());
+    };
+    let name = s[..colon_pos].trim();
+    if name.is_empty() {
+        return Err("Header name must not be empty".to_string());
+    }
+    Ok(s.to_string())
+}
+
 /// Default values used throughout the project.
 pub mod defaults {
     /// Maximum number of concurrent network requests.
@@ -136,6 +148,14 @@ pub struct Cli {
         value_parser = validate_basic_auth,
     )]
     pub basic_auth: Option<String>,
+
+    #[arg(
+        short = 'H',
+        long = "header",
+        help = "Custom header to include in each request (format: 'Name: Value'). Can be specified multiple times.",
+        value_parser = validate_header,
+    )]
+    pub headers: Vec<String>,
 
     #[arg(
         short = 'c',
@@ -277,6 +297,7 @@ pub struct ConfigFile {
     pub report_path: Option<String>,
     pub report_path_json: Option<String>,
     pub report_path_html: Option<String>,
+    pub headers: Option<Vec<String>>,
 }
 
 impl ConfigFile {
@@ -408,6 +429,16 @@ impl Cli {
         if let Some(ref v) = config.report_path_html {
             if !arg_provided("report_path_html") {
                 self.report_path_html = expand_path(v).ok();
+            }
+        }
+        if let Some(ref v) = config.headers {
+            if !arg_provided("header") {
+                for h in v {
+                    match validate_header(h) {
+                        Ok(valid) => self.headers.push(valid),
+                        Err(e) => eprintln!("Warning: invalid header in config file: {}", e),
+                    }
+                }
             }
         }
     }

@@ -25,16 +25,34 @@ pub fn build_client(options: &Cli) -> Result<reqwest::Client, Box<dyn Error>> {
         client_builder = client_builder.redirect(reqwest::redirect::Policy::limited(10));
     }
 
+    let mut headers = reqwest::header::HeaderMap::new();
+
     if let Some(auth) = &options.basic_auth {
         if !auth.is_empty() {
-            let mut headers = reqwest::header::HeaderMap::new();
             let encoded_credentials =
                 base64::engine::general_purpose::STANDARD.encode(auth.as_bytes());
             let auth_value = format!("Basic {}", encoded_credentials).parse()?;
             headers.insert(reqwest::header::AUTHORIZATION, auth_value);
-            client_builder = client_builder.default_headers(headers);
         }
     }
+
+    for header_str in &options.headers {
+        if let Some(colon_pos) = header_str.find(':') {
+            let name = header_str[..colon_pos].trim();
+            let value = header_str[colon_pos + 1..].trim();
+            if let (Ok(header_name), Ok(header_value)) = (
+                reqwest::header::HeaderName::from_bytes(name.as_bytes()),
+                reqwest::header::HeaderValue::from_str(value),
+            ) {
+                headers.insert(header_name, header_value);
+            }
+        }
+    }
+
+    if !headers.is_empty() {
+        client_builder = client_builder.default_headers(headers);
+    }
+
     Ok(client_builder.build()?)
 }
 
