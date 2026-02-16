@@ -296,6 +296,20 @@ jobs:
           git push
 
   # ===========================================================================
+  # PUBLISH - crates.io
+  # ===========================================================================
+
+  publish-crates-io:
+    needs: [plan, host]
+    if: ${{ needs.plan.outputs.publishing == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  # ===========================================================================
   # PUBLISH - PyPI (runs in parallel with cargo-dist builds)
   # ===========================================================================
 
@@ -369,12 +383,13 @@ jobs:
   # ===========================================================================
 
   announce:
-    needs: [plan, host, publish-homebrew-formula, build-pypi-wheels, publish-pypi]
+    needs: [plan, host, publish-homebrew-formula, publish-crates-io, build-pypi-wheels, publish-pypi]
     if: >-
       ${{
         always() &&
         needs.host.result == 'success' &&
         (needs.publish-homebrew-formula.result == 'skipped' || needs.publish-homebrew-formula.result == 'success') &&
+        (needs.publish-crates-io.result == 'skipped' || needs.publish-crates-io.result == 'success') &&
         (needs.build-pypi-wheels.result == 'skipped' || needs.build-pypi-wheels.result == 'success') &&
         (needs.publish-pypi.result == 'skipped' || needs.publish-pypi.result == 'success')
       }}
