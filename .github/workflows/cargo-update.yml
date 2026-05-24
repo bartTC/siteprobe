@@ -1,0 +1,35 @@
+---
+name: Weekly Cargo Update
+
+"on":
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Run cargo update
+        run: cargo update
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: weekly cargo update"
+          title: "chore: weekly cargo update"
+          body: |
+            Automated weekly `cargo update` to refresh `Cargo.lock`.
+
+            Review the diff and merge if CI passes.
+          branch: chore/cargo-update
+          delete-branch: true
+          labels: dependencies
