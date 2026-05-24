@@ -21,6 +21,9 @@ jobs:
       - name: Run cargo update
         run: cargo update
 
+      - name: Verify build and tests still pass
+        run: cargo test --all-targets --locked
+
       - name: Open pull request
         uses: peter-evans/create-pull-request@v7
         with:
