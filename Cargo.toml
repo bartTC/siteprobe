@@ -26,29 +26,29 @@ keywords = [
 
 
 [dependencies]
-base64 = "0.22.1"
-clap = { version = "4.5.31", features = ["derive", "wrap_help"] }
-console = "0.16.3"
-csv = "1.3.1"
+base64 = "0.23.1"
+clap = { version = "4.6.6", features = ["derive", "wrap_help"] }
+console = "0.16.4"
+csv = "1.4.0"
 flate2 = "1.1"
-futures = "0.3.31"
-indicatif = "0.17.11"
+futures = "0.3.34"
+indicatif = "0.18.6"
 prettytable = "0.10.0"
-quick-xml = "0.37"
-rand = "0.9.0"
-reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"] }
-tokio = { version = "1.52.3", features = ["fs", "macros", "rt-multi-thread", "sync", "time"] }
-unicode-segmentation = "1.12.0"
-url = "2.5.4"
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.150"
-governor = "0.10.0"
-shellexpand = "3.1"
-toml = "0.8"
+quick-xml = "0.42"
+rand = "0.10.2"
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
+tokio = { version = "1.53.1", features = ["fs", "macros", "rt-multi-thread", "sync", "time"] }
+unicode-segmentation = "1.13.3"
+url = "2.5.8"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+governor = "0.10.4"
+shellexpand = "3.1.2"
+toml = "1.1"
 
 [dev-dependencies]
-tempfile = "3.23.0"
-wiremock = "0.6"
+tempfile = "3.27.0"
+wiremock = "0.6.5"
 
 # The profile that 'dist' will build with
 [profile.dist]

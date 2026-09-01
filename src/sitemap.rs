@@ -10,6 +10,7 @@ use governor::state::{InMemoryState, NotKeyed};
 use governor::{Quota, RateLimiter};
 use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::name::QName;
 use reqwest::Client;
 use std::error::Error;
 use std::fmt;
@@ -137,8 +138,8 @@ pub fn identify_sitemap_type(xml: &str) -> SitemapType {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) => {
                 return match e.name().as_ref() {
-                    b"sitemapindex" => SitemapType::SitemapIndex,
-                    b"urlset" => SitemapType::UrlSet,
+                    "sitemapindex" => SitemapType::SitemapIndex,
+                    "urlset" => SitemapType::UrlSet,
                     _ => SitemapType::Unknown,
                 };
             }
@@ -160,10 +161,13 @@ pub fn extract_sitemap_urls(xml: &str) -> Vec<String> {
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e)) if e.name().as_ref() == b"loc" => {
-                // Read the next text event which contains the URL
-                if let Ok(Event::Text(e)) = reader.read_event_into(&mut buf) {
-                    if let Ok(url) = e.unescape() {
+            Ok(Event::Start(ref e)) if e.name().as_ref() == "loc" => {
+                // Read everything up to the closing </loc> tag. Text events are
+                // split at entity references, so a single Text event would lose
+                // everything past the first `&amp;`.
+                if let Ok(text) = reader.read_text(QName("loc")) {
+                    let decoded = text.xml_content(quick_xml::XmlVersion::Implicit1_0);
+                    if let Ok(url) = quick_xml::escape::unescape(&decoded) {
                         urls.push(url.into_owned());
                     }
                 }

@@ -22,7 +22,9 @@ modernization, and a new minimum supported Rust version:
 - Detection of explicitly passed CLI arguments (for config file merging) now
   uses clap's value source tracking instead of scanning the raw command line,
   which was fragile around combined short flags like `-c4`.
-- Upgraded all dependencies to their latest versions.
+- Upgraded all dependencies to their latest versions, including the major
+  bumps reqwest 0.13, quick-xml 0.42, rand 0.10, indicatif 0.18, base64 0.23,
+  and toml 1.1, with the required API migrations.
 - Modernized the codebase: Rust edition 2024, `std::sync::LazyLock` instead
   of the `once_cell` crate, non-blocking file writes via `tokio::fs`, and a
   declared minimum supported Rust version (1.86). The edition 2021 downgrade
