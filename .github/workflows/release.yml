@@ -22,6 +22,7 @@ jobs:
   # ===========================================================================
 
   plan:
+    name: Plan release
     runs-on: "ubuntu-22.04"
     outputs:
       val: ${{ steps.plan.outputs.manifest }}
@@ -62,7 +63,7 @@ jobs:
   # ===========================================================================
 
   build-local-artifacts:
-    name: build-local-artifacts (${{ join(matrix.targets, ', ') }})
+    name: Build binaries (${{ join(matrix.targets, ', ') }})
     needs: [plan]
     if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null && (needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload') }}
     strategy:
@@ -92,7 +93,7 @@ jobs:
         run: ${{ matrix.install_dist.run }}
       # Get the dist-manifest
       - name: Fetch local artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: artifacts-*
           path: target/distrib/
@@ -131,6 +132,7 @@ jobs:
   # ===========================================================================
 
   build-global-artifacts:
+    name: Build installers & checksums
     needs: [plan, build-local-artifacts]
     runs-on: "ubuntu-22.04"
     env:
@@ -142,14 +144,14 @@ jobs:
           persist-credentials: false
           submodules: recursive
       - name: Install cached dist
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: cargo-dist-cache
           path: ~/.cargo/bin/
       - run: chmod +x ~/.cargo/bin/dist
       # Get all the local artifacts for the global tasks to use (for e.g. checksums)
       - name: Fetch local artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: artifacts-*
           path: target/distrib/
@@ -179,6 +181,7 @@ jobs:
   # ===========================================================================
 
   host:
+    name: Create GitHub release
     needs: [plan, build-local-artifacts, build-global-artifacts]
     if: >-
       ${{
@@ -199,14 +202,14 @@ jobs:
           persist-credentials: false
           submodules: recursive
       - name: Install cached dist
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: cargo-dist-cache
           path: ~/.cargo/bin/
       - run: chmod +x ~/.cargo/bin/dist
       # Fetch artifacts from scratch-storage
       - name: Fetch artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: artifacts-*
           path: target/distrib/
@@ -226,7 +229,7 @@ jobs:
           path: dist-manifest.json
       # Create a GitHub Release while uploading all files to it
       - name: "Download GitHub Artifacts"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: artifacts-*
           path: artifacts
@@ -252,6 +255,7 @@ jobs:
   # ===========================================================================
 
   publish-homebrew-formula:
+    name: Publish to Homebrew tap
     needs: [plan, host]
     runs-on: "ubuntu-22.04"
     env:
@@ -268,7 +272,7 @@ jobs:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
       # So we have access to the formula
       - name: Fetch homebrew formulae
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: artifacts-*
           path: Formula/
@@ -300,12 +304,22 @@ jobs:
   # ===========================================================================
 
   publish-crates-io:
+    name: Publish to crates.io
     needs: [plan, host]
     if: ${{ needs.plan.outputs.publishing == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - run: cargo publish
+      # Skip if this version is already on crates.io, so a re-run of a
+      # partially failed release converges instead of erroring out.
+      - name: Publish to crates.io
+        run: |
+          VERSION=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[0].version')
+          if curl -fsSL "https://index.crates.io/si/te/siteprobe" | grep -q "\"vers\":\"${VERSION}\""; then
+            echo "siteprobe ${VERSION} is already published to crates.io, skipping."
+          else
+            cargo publish
+          fi
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
@@ -314,6 +328,7 @@ jobs:
   # ===========================================================================
 
   build-pypi-wheels:
+    name: Build PyPI wheels (${{ matrix.target }})
     needs: [plan]
     if: ${{ needs.plan.outputs.publishing == 'true' }}
     strategy:
@@ -340,21 +355,29 @@ jobs:
           path: dist/*.whl
 
   publish-pypi:
+    name: Publish to PyPI
     needs: [plan, build-pypi-wheels, host]
     runs-on: ubuntu-latest
+    # Job-level permissions replace the workflow default, so contents: write
+    # must be repeated for the release-notes edit below.
+    permissions:
+      id-token: write # Required for PyPI Trusted Publishing
+      contents: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: pypi-wheels-*
           path: dist/
           merge-multiple: true
+      # Authenticates via PyPI Trusted Publishing (no token needed):
+      # https://pypi.org/manage/project/siteprobe/settings/publishing/
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.PYPI_TOKEN }}
+          skip-existing: true
       - name: Add PyPI instructions to release notes
         run: |
           VERSION="${{ needs.plan.outputs.tag }}"
@@ -383,6 +406,7 @@ jobs:
   # ===========================================================================
 
   announce:
+    name: Finalize release
     needs: [plan, host, publish-homebrew-formula, publish-crates-io, build-pypi-wheels, publish-pypi]
     if: >-
       ${{

@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.4.0 (WIP)
+## v1.4.0 (2026-09-01)
 
 Maintenance release. No new features, but a couple of fixes, internal
 modernization, and a new minimum supported Rust version:
