@@ -3,3 +3,4 @@
 /*.json
 /*.html
 *.profraw
+.DS_Store

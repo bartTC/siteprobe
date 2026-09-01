@@ -1,8 +1,17 @@
-use siteprobe::options::ConfigFile;
+use clap::{ArgMatches, CommandFactory, FromArgMatches};
+use siteprobe::options::{Cli, ConfigFile};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 use tempfile::NamedTempFile;
+
+/// Parse CLI options from the given argument list, returning both the parsed
+/// options and the raw matches needed by `apply_config`.
+fn parse_cli(args: &[&str]) -> (Cli, ArgMatches) {
+    let matches = Cli::command().get_matches_from(args);
+    let cli = Cli::from_arg_matches(&matches).expect("Failed to parse CLI arguments");
+    (cli, matches)
+}
 
 /// Test 1: ConfigFile deserialization from a valid TOML string.
 #[test]
@@ -141,9 +150,6 @@ fn test_cli_config_nonexistent_path_errors() {
 /// Test 6: apply_config merges all config file fields into CLI defaults.
 #[test]
 fn test_apply_config_all_fields() {
-    use clap::Parser;
-    use siteprobe::options::Cli;
-
     let config = ConfigFile {
         user_agent: Some("CustomBot/2.0".to_string()),
         concurrency_limit: Some(20),
@@ -161,8 +167,8 @@ fn test_apply_config_all_fields() {
         headers: Some(vec!["X-Token: abc".to_string()]),
     };
 
-    let mut cli = Cli::parse_from(["siteprobe", "http://example.com/sitemap.xml"]);
-    cli.apply_config(&config);
+    let (mut cli, matches) = parse_cli(&["siteprobe", "http://example.com/sitemap.xml"]);
+    cli.apply_config(&config, &matches);
 
     assert_eq!(cli.user_agent, "CustomBot/2.0");
     assert_eq!(cli.concurrency_limit, 20);
@@ -183,16 +189,13 @@ fn test_apply_config_all_fields() {
 /// Test 7: apply_config with invalid rate_limit logs warning but doesn't crash.
 #[test]
 fn test_apply_config_invalid_rate_limit() {
-    use clap::Parser;
-    use siteprobe::options::Cli;
-
     let config = ConfigFile {
         rate_limit: Some("invalid".to_string()),
         ..ConfigFile::default()
     };
 
-    let mut cli = Cli::parse_from(["siteprobe", "http://example.com/sitemap.xml"]);
-    cli.apply_config(&config);
+    let (mut cli, matches) = parse_cli(&["siteprobe", "http://example.com/sitemap.xml"]);
+    cli.apply_config(&config, &matches);
 
     // rate_limit should remain None since the config value was invalid
     assert!(cli.rate_limit.is_none());
@@ -201,31 +204,23 @@ fn test_apply_config_invalid_rate_limit() {
 /// Test 8: apply_config with invalid header logs warning but doesn't crash.
 #[test]
 fn test_apply_config_invalid_header() {
-    use clap::Parser;
-    use siteprobe::options::Cli;
-
     let config = ConfigFile {
         headers: Some(vec!["NoColon".to_string(), "Valid: header".to_string()]),
         ..ConfigFile::default()
     };
 
-    let mut cli = Cli::parse_from(["siteprobe", "http://example.com/sitemap.xml"]);
-    cli.apply_config(&config);
+    let (mut cli, matches) = parse_cli(&["siteprobe", "http://example.com/sitemap.xml"]);
+    cli.apply_config(&config, &matches);
 
     // Only the valid header should be added
     assert_eq!(cli.headers, vec!["Valid: header".to_string()]);
 }
 
 /// Test 9: CLI args override config file values.
-/// Config sets concurrency_limit=10, CLI passes --concurrency-limit 5, verify 5 wins.
-/// We use --json output to inspect the effective settings indirectly. Since we cannot
-/// directly inspect parsed options from outside, we verify via the --config flag being
-/// accepted alongside explicit CLI args, and test the override logic at the unit level.
+/// Config sets concurrency_limit=10, CLI passes --concurrency-limit 5, verify 5 wins
+/// while values without a CLI override (request_timeout) still come from the config.
 #[test]
 fn test_cli_args_override_config_values() {
-    use clap::Parser;
-    use siteprobe::options::Cli;
-
     // Create a config file with concurrency_limit = 10
     let mut tmp = NamedTempFile::new().expect("Failed to create temp file");
     writeln!(tmp, "concurrency_limit = 10\nrequest_timeout = 99").unwrap();
@@ -236,20 +231,21 @@ fn test_cli_args_override_config_values() {
     assert_eq!(config.concurrency_limit, Some(10));
     assert_eq!(config.request_timeout, Some(99));
 
-    // Simulate CLI with --concurrency-limit 5 (overrides config's 10)
-    // We parse from a fake arg vector. Note: apply_config uses arg_provided()
-    // which checks std::env::args(), so we test the config values are set
-    // when no CLI override is present.
-    let mut cli = Cli::parse_from(["siteprobe", "http://example.com/sitemap.xml"]);
+    // CLI with --concurrency-limit 5 (overrides config's 10)
+    let (mut cli, matches) = parse_cli(&[
+        "siteprobe",
+        "http://example.com/sitemap.xml",
+        "--concurrency-limit",
+        "5",
+    ]);
 
-    // Before applying config, concurrency_limit is the default (4)
-    assert_eq!(cli.concurrency_limit, 4);
+    // Before applying config, request_timeout is the default (10)
+    assert_eq!(cli.concurrency_limit, 5);
     assert_eq!(cli.request_timeout, 10);
 
-    // After applying config, values from config should take effect
-    // (since arg_provided checks std::env::args which won't have our flags)
-    cli.apply_config(&config);
+    cli.apply_config(&config, &matches);
 
-    assert_eq!(cli.concurrency_limit, 10);
+    // The explicit CLI value wins, the config fills in the rest.
+    assert_eq!(cli.concurrency_limit, 5);
     assert_eq!(cli.request_timeout, 99);
 }

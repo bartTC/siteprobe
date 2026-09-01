@@ -1,8 +1,9 @@
 use crate::utils::validate_basic_auth;
-use clap::{value_parser, Parser, ValueHint};
+use clap::parser::ValueSource;
+use clap::{ArgMatches, Parser, ValueHint, value_parser};
 use serde::Deserialize;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use url::Url;
 
 /// Validates that a header string is in the format "Name: Value" with a non-empty name.
@@ -47,7 +48,8 @@ pub fn expand_path(s: &str) -> Result<PathBuf, String> {
 fn validate_output_dir_str(s: &str) -> Result<PathBuf, String> {
     let path = expand_path(s)?;
     if path.exists() && path.is_dir() {
-        println!(
+        // Warn on stderr so that stdout stays clean for `--json` piping.
+        eprintln!(
             "\n⚠️ The output directory '{}' already exists. Existing documents will be overwritten.\n",
             path.display()
         );
@@ -164,7 +166,7 @@ pub struct Cli {
         short = 'c',
         long,
         help = "Maximum number of concurrent requests allowed",
-        default_value_t = defaults::SEMAPHORE as u8,
+        default_value_t = defaults::SEMAPHORE,
         value_parser = clap::value_parser!(u8).range(1..=100)
     )]
     pub concurrency_limit: u8,
@@ -305,13 +307,13 @@ pub struct ConfigFile {
 
 impl ConfigFile {
     /// Load a config file from the given path, or return a default (empty) config.
-    pub fn load(path: Option<&PathBuf>) -> Result<Self, String> {
+    pub fn load(path: Option<&Path>) -> Result<Self, String> {
         let config_path = match path {
             Some(p) => {
                 if !p.exists() {
                     return Err(format!("Config file '{}' not found.", p.display()));
                 }
-                p.clone()
+                p.to_path_buf()
             }
             None => {
                 let default_path = PathBuf::from(".siteprobe.toml");
@@ -341,50 +343,27 @@ impl ConfigFile {
 }
 
 /// Returns true if the user explicitly provided the given CLI argument
-/// by scanning the raw command-line arguments for the long or short flag.
-fn arg_provided(name: &str) -> bool {
-    let short_map: &[(&str, &str)] = &[
-        ("concurrency_limit", "-c"),
-        ("rate_limit", "-l"),
-        ("output_dir", "-o"),
-        ("append_timestamp", "-a"),
-        ("report_path", "-r"),
-        ("report_path_json", "-j"),
-        ("request_timeout", "-t"),
-        ("slow_threshold", "-s"),
-        ("follow_redirects", "-f"),
-    ];
-    let long_with_dash = format!("--{}", name.replace('_', "-"));
-    let args: Vec<String> = std::env::args().collect();
-    for arg in &args {
-        if arg == &long_with_dash || arg.starts_with(&format!("{}=", long_with_dash)) {
-            return true;
-        }
-        if let Some((_, short)) = short_map.iter().find(|(n, _)| *n == name) {
-            if arg == *short {
-                return true;
-            }
-        }
-    }
-    false
+/// (as opposed to it being filled in from a default value).
+fn arg_provided(matches: &ArgMatches, id: &str) -> bool {
+    matches.value_source(id) == Some(ValueSource::CommandLine)
 }
 
 impl Cli {
     /// Merge config file values into the CLI options.
     /// CLI arguments take priority over config file values.
-    pub fn apply_config(&mut self, config: &ConfigFile) {
+    pub fn apply_config(&mut self, config: &ConfigFile, matches: &ArgMatches) {
         if let Some(ref v) = config.user_agent {
-            if !arg_provided("user_agent") {
+            if !arg_provided(matches, "user_agent") {
                 self.user_agent = v.clone();
             }
         }
         if let Some(v) = config.concurrency_limit {
-            if !arg_provided("concurrency_limit") {
+            if !arg_provided(matches, "concurrency_limit") {
                 self.concurrency_limit = v;
             }
         }
         if let Some(ref v) = config.rate_limit {
-            if !arg_provided("rate_limit") {
+            if !arg_provided(matches, "rate_limit") {
                 match parse_rate_limit(v) {
                     Ok(rpm) => self.rate_limit = Some(rpm),
                     Err(e) => eprintln!("Warning: invalid rate_limit in config file: {}", e),
@@ -392,57 +371,57 @@ impl Cli {
             }
         }
         if let Some(v) = config.request_timeout {
-            if !arg_provided("request_timeout") {
+            if !arg_provided(matches, "request_timeout") {
                 self.request_timeout = v;
             }
         }
         if let Some(v) = config.slow_threshold {
-            if !arg_provided("slow_threshold") {
+            if !arg_provided(matches, "slow_threshold") {
                 self.slow_threshold = Some(v);
             }
         }
         if let Some(v) = config.slow_num {
-            if !arg_provided("slow_num") {
+            if !arg_provided(matches, "slow_num") {
                 self.slow_num = v;
             }
         }
         if let Some(ref v) = config.basic_auth {
-            if !arg_provided("basic_auth") {
+            if !arg_provided(matches, "basic_auth") {
                 self.basic_auth = Some(v.clone());
             }
         }
         if let Some(v) = config.follow_redirects {
-            if !arg_provided("follow_redirects") {
+            if !arg_provided(matches, "follow_redirects") {
                 self.follow_redirects = v;
             }
         }
         if let Some(v) = config.append_timestamp {
-            if !arg_provided("append_timestamp") {
+            if !arg_provided(matches, "append_timestamp") {
                 self.append_timestamp = v;
             }
         }
         if let Some(v) = config.retries {
-            if !arg_provided("retries") {
+            if !arg_provided(matches, "retries") {
                 self.retries = v;
             }
         }
         if let Some(ref v) = config.report_path {
-            if !arg_provided("report_path") {
+            if !arg_provided(matches, "report_path") {
                 self.report_path = expand_path(v).ok();
             }
         }
         if let Some(ref v) = config.report_path_json {
-            if !arg_provided("report_path_json") {
+            if !arg_provided(matches, "report_path_json") {
                 self.report_path_json = expand_path(v).ok();
             }
         }
         if let Some(ref v) = config.report_path_html {
-            if !arg_provided("report_path_html") {
+            if !arg_provided(matches, "report_path_html") {
                 self.report_path_html = expand_path(v).ok();
             }
         }
         if let Some(ref v) = config.headers {
-            if !arg_provided("header") {
+            if !arg_provided(matches, "headers") {
                 for h in v {
                     match validate_header(h) {
                         Ok(valid) => self.headers.push(valid),

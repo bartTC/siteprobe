@@ -133,6 +133,6 @@ pub fn percent(percent: f64) -> String {
 }
 
 pub fn ms(duration: Duration) -> String {
-    let milliseconds = duration.as_millis() as f64;
+    let milliseconds = duration.as_secs_f64() * 1000.0;
     format!("{milliseconds:.2}ms")
 }

@@ -168,7 +168,7 @@ async fn test_e2e_valid_sitemap() {
         .expect("Failed to read output dir")
         .collect();
     assert!(
-        downloaded_files.len() >= 1,
+        !downloaded_files.is_empty(),
         "Should have at least 1 downloaded page"
     );
 }

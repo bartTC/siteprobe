@@ -1,5 +1,5 @@
 use siteprobe::sitemap::{
-    decompress_gzip, extract_sitemap_urls, identify_sitemap_type, is_gzip_content, SitemapType,
+    SitemapType, decompress_gzip, extract_sitemap_urls, identify_sitemap_type, is_gzip_content,
 };
 
 // ===========================================================================================
@@ -342,8 +342,8 @@ fn test_is_gzip_content_by_magic_bytes() {
 
 #[test]
 fn test_decompress_gzip_valid() {
-    use flate2::write::GzEncoder;
     use flate2::Compression;
+    use flate2::write::GzEncoder;
     use std::io::Write;
 
     let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -383,8 +383,8 @@ fn test_decompress_gzip_empty() {
 
 #[test]
 fn test_gzip_roundtrip_sitemap_index() {
-    use flate2::write::GzEncoder;
     use flate2::Compression;
+    use flate2::write::GzEncoder;
     use std::io::Write;
 
     let xml = r#"<?xml version="1.0" encoding="UTF-8"?>

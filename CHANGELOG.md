@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.4.0 (WIP)
+
+Maintenance release. No new features, but a couple of fixes, internal
+modernization, and a new minimum supported Rust version:
+
+- Fixed a bug where URLs that timed out or failed to connect were silently
+  missing from the report entirely (the request task crashed internally).
+  They now show up with their mapped status code (408/502/400) as intended,
+  and any request failure that can't be mapped to a status code is reported
+  on stderr instead of being dropped.
+- Fixed median, P90, P95, and P99 response time statistics: they were
+  computed on the unsorted list of response times, effectively returning
+  arbitrary values. Response times are now sorted before the percentiles
+  are taken.
+- Fixed the "output directory already exists" warning being printed to
+  stdout, which corrupted the `--json` output when `--output-dir` pointed
+  to an existing directory. It is now printed to stderr.
+- Response time values in the text report now show real fractional
+  milliseconds instead of always ending in `.00`.
+- Detection of explicitly passed CLI arguments (for config file merging) now
+  uses clap's value source tracking instead of scanning the raw command line,
+  which was fragile around combined short flags like `-c4`.
+- Upgraded all dependencies to their latest versions.
+- Modernized the codebase: Rust edition 2024, `std::sync::LazyLock` instead
+  of the `once_cell` crate, non-blocking file writes via `tokio::fs`, and a
+  declared minimum supported Rust version (1.86). The edition 2021 downgrade
+  from v1.2.2 no longer served its purpose, since today's dependency tree
+  already requires Rust 1.86+ to build from source.
+- CI now enforces `cargo fmt` and `cargo clippy -D warnings`.
+
 ## v1.3.0 (2026-02-16)
 
 - Added gzip sitemap support. Siteprobe now handles `.xml.gz` sitemaps,

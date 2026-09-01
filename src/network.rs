@@ -3,7 +3,7 @@ use crate::report::Response;
 use crate::storage::store_response_on_disk;
 use base64::Engine;
 use std::error::Error;
-use std::path::PathBuf;
+use std::path::Path;
 use std::time::Duration;
 
 /// Builds and configures the HTTP client based on the provided CLI options.
@@ -19,7 +19,7 @@ pub fn build_client(options: &Cli) -> Result<reqwest::Client, Box<dyn Error>> {
     let mut client_builder = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .user_agent(options.user_agent.as_str())
-        .timeout(Duration::from_secs(options.request_timeout as u64));
+        .timeout(Duration::from_secs(options.request_timeout));
 
     if options.follow_redirects {
         client_builder = client_builder.redirect(reqwest::redirect::Policy::limited(10));
@@ -56,74 +56,63 @@ pub fn build_client(options: &Cli) -> Result<reqwest::Client, Box<dyn Error>> {
     Ok(client_builder.build()?)
 }
 
-/// Fetches the content of a given URL as a `String`.
-///
-/// This function sends a GET request to the specified URL using the provided
-/// asynchronous HTTP client (`reqwest::Client`). It ensures the response has
-/// a successful HTTP status code, then retrieves the response body as text
-/// and returns it.
-///
-/// # Arguments
-///
-/// * `url` - A string slice that holds the URL to be fetched.
-/// * `client` - A reference to a `reqwest::Client` used to perform the HTTP request.
-///
-/// # Returns
-///
-/// On success, returns a `Result` containing the content of the URL as a `String`.
-/// On failure, returns a `reqwest::Error` wrapped in a `Result::Err`.
-///
-/// # Errors
-///
-/// Fetches the content at the specified URL using the given HTTP client.
+/// Fetches the given URL and captures the response metadata.
 ///
 /// This asynchronous function makes a GET request to the specified URL and captures:
 /// - The HTTP status code of the response.
-/// - The size of the response content (in bytes).
+/// - The size of the response body (in bytes).
 /// - The total duration it took to complete the request.
 ///
-/// # Parameters
-/// - `url`: A string slice representing the URL to fetch.
-/// - `client`: A reference to a `reqwest::Client` instance used to perform the request.
+/// If `output_dir` is set, the response body is also stored on disk.
 ///
-/// # Returns
-/// Returns a `Result` containing a [`Response`](crate::report::Response) struct with the
-/// request metadata on success, or a boxed error (`Box<dyn Error + Send + Sync>`) on failure.
+/// # Arguments
 ///
-/// # Error Handling
-/// In case of an HTTP error, such as connection issues, request timeouts, or client-related
-/// errors (e.g., malformed request), this function returns standardized HTTP status codes
-/// (e.g., 408 for timeout, 502 for connection errors, etc.).
-/// Any unexpected errors are propagated as `Err(Box<dyn Error + Send + Sync>)`.
+/// * `url` - A string slice representing the URL to fetch.
+/// * `client` - A reference to a `reqwest::Client` instance used to perform the request.
+/// * `output_dir` - An optional directory where the response body is stored on disk.
+///
+/// # Errors
+///
+/// Common request failures are mapped to standardized HTTP status codes instead of
+/// errors (408 for timeouts, 502 for connection errors, 400 for malformed requests),
+/// so they show up as regular entries in the report. Any other error (e.g. exceeding
+/// the redirect limit) is propagated as `Err(reqwest::Error)`.
 pub async fn get_url_response(
     url: &str,
     client: &reqwest::Client,
-    output_dir: &Option<PathBuf>,
+    output_dir: Option<&Path>,
 ) -> Result<Response, reqwest::Error> {
     let start_time = tokio::time::Instant::now();
     let response = client.get(url).send().await;
 
-    let (status, url, content_length, body) = match response {
+    // `final_url` is the URL the response actually came from (it may differ from
+    // the requested URL when redirects are followed). It is `None` when the
+    // request failed before receiving a response.
+    let (status, final_url, body) = match response {
         Ok(resp) => {
-            let url = Some(resp.url().clone());
+            let final_url = Some(resp.url().clone());
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            (status, url, body.len(), Some(body))
+            (status, final_url, Some(body))
         }
-        Err(e) if e.is_timeout() => (reqwest::StatusCode::REQUEST_TIMEOUT, None, 0, None),
-        Err(e) if e.is_connect() => (reqwest::StatusCode::BAD_GATEWAY, None, 0, None),
-        Err(e) if e.is_request() => (reqwest::StatusCode::BAD_REQUEST, None, 0, None),
+        Err(e) if e.is_timeout() => (reqwest::StatusCode::REQUEST_TIMEOUT, None, None),
+        Err(e) if e.is_connect() => (reqwest::StatusCode::BAD_GATEWAY, None, None),
+        Err(e) if e.is_request() => (reqwest::StatusCode::BAD_REQUEST, None, None),
         Err(e) => return Err(e),
     };
 
-    if let (Some(output_dir), Some(url_ref)) = (output_dir, url.as_ref()) {
-        store_response_on_disk(output_dir, url_ref, body.unwrap_or_default().as_str()).await;
+    let response_size = body.as_ref().map_or(0, String::len);
+
+    if let (Some(output_dir), Some(final_url), Some(body)) =
+        (output_dir, final_url.as_ref(), body.as_deref())
+    {
+        store_response_on_disk(output_dir, final_url, body).await;
     }
 
     Ok(Response {
         response_time: start_time.elapsed(),
-        response_size: content_length,
-        url: url.unwrap().to_string(),
+        response_size,
+        url: final_url.map_or_else(|| url.to_string(), |u| u.to_string()),
         status_code: status,
     })
 }

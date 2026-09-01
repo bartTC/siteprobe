@@ -1,56 +1,21 @@
-use once_cell::sync::Lazy;
+//! Table visualization utility for report metrics.
+//!
+//! A [`Metrics`] value holds a list of labeled [`Entry`] items, where each entry
+//! carries a human-readable label/value pair for the text report and a
+//! `json_label`/`json_value` pair for the JSON report. [`Metrics::build_table`]
+//! renders the entries as a bordered table using the `prettytable` crate, and
+//! the [`serde::Serialize`] implementation turns them into a flat
+//! `{jsonLabel: value}` JSON object.
+
 use prettytable::format::{FormatBuilder, LinePosition, LineSeparator, TableFormat};
 use prettytable::{Cell, Row, Table};
 use serde::{Serialize, Serializer};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
-/// # Table Visualization Utility
-///
-/// ## Overview
-///
-/// This Rust file provides a utility for rendering textual tables using the `prettytable` crate.
-/// It combines reusable table formatting (powered by `once_cell` for lazy initialization) with a
-/// structure for managing labeled key-value pairs, encapsulated in the `Metrics` struct. The main
-/// goal of this utility is to create a clean and visually appealing tabular representation of data,
-/// which can be leveraged in CLI tools or logging outputs.
-///
-/// ## Usage
-///
-/// 1. **Define Metrics**:
-///    Populate a list of key-value pairs using `LabeledValue` entries.
-///
-/// 2. **Convert to Table**:
-///    Use the `Metrics::build_table` method to generate the table.
-///
-/// ### Example:
-///
-/// ```rust,ignore
-/// use your_module_name::{LabeledValue, Metrics};
-///
-/// let metrics = Metrics(vec![
-///     LabeledValue { label: "Key1", value: "Value1".to_string() },
-///     LabeledValue { label: "Key2", value: "Value2".to_string() },
-/// ]);
-///
-/// println!("{}", metrics.build_table());
-/// ```
-///
-/// ### Output:
-/// ```text
-/// ┌──────────┬──────────┐
-/// │  Key1    │  Value1  │
-/// │  Key2    │  Value2  │
-/// └──────────┴──────────┘
-/// ```
-///
-/// ## Dependencies
-///
-/// - **once_cell**: Used for the lazy initialization of the formatting configuration.
-/// - **prettytable**: Provides functionalities for defining table formats and rendering tabular data.
-///
-///
-static TABLE_FORMAT: Lazy<TableFormat> = Lazy::new(|| {
+/// A bordered table format with box-drawing characters, used for metric blocks.
+static TABLE_FORMAT: LazyLock<TableFormat> = LazyLock::new(|| {
     FormatBuilder::new()
         .column_separator('│')
         .borders('│')
@@ -63,8 +28,9 @@ static TABLE_FORMAT: Lazy<TableFormat> = Lazy::new(|| {
         .build()
 });
 
-pub static CLEAN_FORMAT: Lazy<TableFormat> =
-    Lazy::new(|| FormatBuilder::new().padding(0, 3).build());
+/// A borderless format used to lay out metric tables side by side.
+pub static CLEAN_FORMAT: LazyLock<TableFormat> =
+    LazyLock::new(|| FormatBuilder::new().padding(0, 3).build());
 
 #[derive(Debug, Serialize)]
 pub struct Entry {

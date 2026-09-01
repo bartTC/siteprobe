@@ -8,8 +8,8 @@ use futures::future::join_all;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::{Quota, RateLimiter};
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 use reqwest::Client;
 use std::error::Error;
 use std::fmt;
@@ -28,10 +28,8 @@ pub enum SitemapType {
     Unknown,
 }
 
-pub struct RateLimitSetup {
-    pub limit: Option<u32>,
-    pub limiter: Option<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
-}
+/// A non-keyed, in-memory rate limiter shared by all request tasks.
+type DirectRateLimiter = RateLimiter<NotKeyed, InMemoryState, DefaultClock>;
 
 // Implement Display for SitemapType
 impl fmt::Display for SitemapType {
@@ -115,7 +113,7 @@ pub async fn get_sitemap_urls(
                     eprintln!(
                         "{} The referenced sitemap is missing: {}",
                         style("[ERROR]").red(),
-                        &sitemap_url
+                        sitemap_url
                     );
                 }
             };
@@ -203,16 +201,16 @@ pub async fn fetch_and_generate_report(
     // Setup concurrency
     let semaphore = Arc::new(Semaphore::new(options.concurrency_limit as usize));
 
-    // Setup rate limiter .
-    let rate_limit_setup = Arc::new(RateLimitSetup {
-        limit: options.rate_limit,
-        limiter: options.rate_limit.map(|rate_limit_value| {
-            RateLimiter::direct(
-                Quota::per_minute(NonZeroU32::new(rate_limit_value).unwrap())
-                    .allow_burst(NonZeroU32::new(1).unwrap()),
-            )
-        }),
-    });
+    // Setup the rate limiter, paired with its requests-per-minute limit for display.
+    let rate_limiter: Option<Arc<(u32, DirectRateLimiter)>> =
+        options.rate_limit.map(|requests_per_minute| {
+            let quota = NonZeroU32::new(requests_per_minute)
+                .expect("rate limit is validated to be at least 1");
+            Arc::new((
+                requests_per_minute,
+                RateLimiter::direct(Quota::per_minute(quota).allow_burst(NonZeroU32::MIN)),
+            ))
+        });
 
     // Setup progress bars.
     let wrapper_pb = indicatif::MultiProgress::new();
@@ -234,7 +232,7 @@ pub async fn fetch_and_generate_report(
 
     let fetches = urls.iter().map(|u| {
         let semaphore = Arc::clone(&semaphore);
-        let rate_limit_setup = Arc::clone(&rate_limit_setup);
+        let rate_limiter = rate_limiter.clone();
         let client = Arc::clone(client);
         let output_dir = options.output_dir.clone();
         let mut url = u.clone();
@@ -251,27 +249,24 @@ pub async fn fetch_and_generate_report(
         tokio::spawn(async move {
             let _permit = semaphore.acquire().await.expect("Semaphore closed");
 
-            if rate_limit_setup.limit.is_some() && rate_limit_setup.limiter.is_some() {
+            if let Some(rate) = rate_limiter.as_deref() {
+                let (limit, limiter) = rate;
+
                 // Set the progress bar message to indicate rate limiting
                 line_pb.set_message(format!(
-                    "Waiting for rate limit ({:?}/min): {}",
-                    rate_limit_setup.limit.unwrap(),
-                    &utils::truncate_message(&url, 80)
+                    "Waiting for rate limit ({}/min): {}",
+                    limit,
+                    utils::truncate_message(&url, 80)
                 ));
 
                 // Wait until the rate limit is satisfied
-                rate_limit_setup
-                    .limiter
-                    .as_ref()
-                    .unwrap()
-                    .until_ready()
-                    .await;
+                limiter.until_ready().await;
             }
 
             line_pb.set_message(format!("Fetching: {}", utils::truncate_message(&url, 80)));
             line_pb.enable_steady_tick(Duration::from_millis(100));
 
-            let mut result = get_url_response(&url, &client, &output_dir).await;
+            let mut result = get_url_response(&url, &client, output_dir.as_deref()).await;
 
             // Retry logic: retry on network errors or 5xx status codes
             for attempt in 1..=retries {
@@ -291,7 +286,7 @@ pub async fn fetch_and_generate_report(
                     utils::truncate_message(&url, 70)
                 ));
                 tokio::time::sleep(Duration::from_secs(1)).await;
-                result = get_url_response(&url, &client, &output_dir).await;
+                result = get_url_response(&url, &client, output_dir.as_deref()).await;
             }
 
             line_pb.finish_and_clear();
@@ -303,20 +298,22 @@ pub async fn fetch_and_generate_report(
     let results: Vec<_> = join_all(fetches).await;
     loading_pb.finish_with_message("- 🏁 Complete!");
 
-    // Process the results and aggregate the responses.
-    let mut report = Report {
+    // Aggregate the responses. Failures that could not be mapped to a status
+    // code are reported on stderr instead of being silently dropped.
+    let mut responses = Vec::with_capacity(results.len());
+    for result in results {
+        match result {
+            Ok(Ok(response)) => responses.push(response),
+            Ok(Err(e)) => eprintln!("{} Request failed: {}", style("[ERROR]").red(), e),
+            Err(e) => eprintln!("{} Request task failed: {}", style("[ERROR]").red(), e),
+        }
+    }
+
+    Ok(Report {
         sitemap_url: options.sitemap_url.to_string(),
         concurrency_limit: options.concurrency_limit,
         rate_limit: options.rate_limit,
         total_time: start_time.elapsed(),
-        responses: std::collections::VecDeque::new(),
-    };
-
-    report.responses = results
-        .into_iter()
-        .filter_map(Result::ok)
-        .flatten()
-        .collect();
-
-    Ok(report)
+        responses,
+    })
 }

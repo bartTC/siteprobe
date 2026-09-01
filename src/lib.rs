@@ -1,5 +1,8 @@
-// Library interface for siteprobe
-// This allows integration tests to access the modules
+//! Siteprobe fetches all URLs from a `sitemap.xml`, checks their existence,
+//! and generates performance reports.
+//!
+//! This library interface exists primarily so the binary and the integration
+//! tests can share the same modules; it is not a stable public API.
 
 pub mod metrics;
 pub mod network;

@@ -1,4 +1,4 @@
-use crate::metrics::{Entry, Metrics, CLEAN_FORMAT};
+use crate::metrics::{CLEAN_FORMAT, Entry, Metrics};
 use crate::options::Cli;
 use crate::utils;
 use console::style;
@@ -6,11 +6,12 @@ use csv::Writer;
 use prettytable::{Cell, Row, Table};
 use reqwest::StatusCode;
 use serde_json::json;
-use std::collections::{HashMap, VecDeque};
+use std::cmp::Reverse;
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::Path;
 use std::process::ExitCode;
 use std::time::Duration;
 
@@ -35,7 +36,7 @@ pub struct Report {
     pub concurrency_limit: u8,
     pub rate_limit: Option<u32>,
     pub total_time: Duration,
-    pub responses: VecDeque<Response>,
+    pub responses: Vec<Response>,
 }
 
 #[derive(Debug)]
@@ -57,11 +58,9 @@ impl Report {
             },
             Entry {
                 label: "Rate Limit",
-                value: if self.rate_limit.is_some() {
-                    format!("{}/min", self.rate_limit.unwrap())
-                } else {
-                    "No".to_string()
-                },
+                value: self
+                    .rate_limit
+                    .map_or_else(|| "No".to_string(), |limit| format!("{}/min", limit)),
                 json_label: "rateLimit",
                 json_value: json!(self.rate_limit),
             },
@@ -187,9 +186,9 @@ impl Report {
     pub fn write_json_report(
         &self,
         options: &Cli,
-        report_path: &PathBuf,
+        report_path: &Path,
     ) -> Result<(), Box<dyn Error>> {
-        // If the report path parent is a director, create it if it doesn't exist yet
+        // Create the report's parent directory if it doesn't exist yet.
         if let Some(parent) = report_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -211,12 +210,8 @@ impl Report {
     }
 
     /// Write a CSV report
-    pub fn write_csv_report(
-        &self,
-        report_path: &PathBuf,
-        quiet: bool,
-    ) -> Result<(), Box<dyn Error>> {
-        // If the report path parent is a director, create it if it doesn't exist yet
+    pub fn write_csv_report(&self, report_path: &Path, quiet: bool) -> Result<(), Box<dyn Error>> {
+        // Create the report's parent directory if it doesn't exist yet.
         if let Some(parent) = report_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -250,7 +245,7 @@ impl Report {
     pub fn write_html_report(
         &self,
         options: &Cli,
-        report_path: &PathBuf,
+        report_path: &Path,
     ) -> Result<(), Box<dyn Error>> {
         if let Some(parent) = report_path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -274,7 +269,7 @@ impl Report {
             .iter()
             .map(|r| r.response_time.as_secs_f64() * 1000.0)
             .collect();
-        let (histogram_svg, histogram_buckets_exist) = if !times_ms.is_empty() {
+        let histogram_svg = if !times_ms.is_empty() {
             let min_t = times_ms.iter().cloned().fold(f64::INFINITY, f64::min);
             let max_t = times_ms.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
             let bucket_count = 20usize;
@@ -341,11 +336,10 @@ impl Report {
                 chart_h + 45.0
             ));
             svg.push_str("</svg>");
-            (svg, true)
+            svg
         } else {
-            (String::from("<p>No data available.</p>"), false)
+            String::from("<p>No data available.</p>")
         };
-        let _ = histogram_buckets_exist;
 
         // Status code bar chart SVG
         let status_svg = if !status_entries.is_empty() {
@@ -633,31 +627,31 @@ footer{{text-align:center;color:#94a3b8;font-size:.75rem;padding:24px 0}}
     // === Statistics ==============================================================================
 
     fn generate_statistics(&self, slow_threshold: Option<f64>) -> Statistics {
-        let report = &self;
-        let total_requests = report.responses.len();
-        let total_time_secs = report.total_time.as_secs_f64();
+        let total_requests = self.responses.len();
+        let total_time_secs = self.total_time.as_secs_f64();
 
-        let response_times: Vec<Duration> =
-            report.responses.iter().map(|r| r.response_time).collect();
-        let response_sizes: Vec<usize> = report.responses.iter().map(|r| r.response_size).collect();
+        // Median and percentiles require the response times in ascending order.
+        let mut response_times: Vec<Duration> =
+            self.responses.iter().map(|r| r.response_time).collect();
+        response_times.sort_unstable();
+        let response_sizes: Vec<usize> = self.responses.iter().map(|r| r.response_size).collect();
 
         let avg_response_time = if total_requests > 0 {
             response_times.iter().map(|d| d.as_secs_f64()).sum::<f64>() / total_requests as f64
         } else {
             0.0
         };
-        let median_response_time = response_times.get(response_times.len() / 2).copied();
-        let min_response_time = response_times.iter().copied().min();
-        let max_response_time = response_times.iter().copied().max();
-        let p90_response_time = response_times
-            .get((response_times.len() as f64 * 0.90) as usize)
-            .copied();
-        let p95_response_time = response_times
-            .get((response_times.len() as f64 * 0.95) as usize)
-            .copied();
-        let p99_response_time = response_times
-            .get((response_times.len() as f64 * 0.99) as usize)
-            .copied();
+        let percentile = |p: f64| {
+            response_times
+                .get((response_times.len() as f64 * p) as usize)
+                .copied()
+        };
+        let median_response_time = percentile(0.50);
+        let min_response_time = response_times.first().copied();
+        let max_response_time = response_times.last().copied();
+        let p90_response_time = percentile(0.90);
+        let p95_response_time = percentile(0.95);
+        let p99_response_time = percentile(0.99);
 
         let variance = if total_requests > 0 {
             response_times
@@ -676,7 +670,7 @@ footer{{text-align:center;color:#94a3b8;font-size:.75rem;padding:24px 0}}
         let mut redirect_count = 0;
         let mut slow_count = 0;
 
-        for response in &report.responses {
+        for response in &self.responses {
             *status_counts.entry(response.status_code).or_insert(0) += 1;
             if response.status_code.is_success() {
                 success_count += 1;
@@ -716,13 +710,19 @@ footer{{text-align:center;color:#94a3b8;font-size:.75rem;padding:24px 0}}
             0.0
         };
 
-        let avg_response_size = if total_requests > 0 {
-            response_sizes.iter().sum::<usize>() / total_requests
-        } else {
-            0
-        };
+        let avg_response_size = response_sizes
+            .iter()
+            .sum::<usize>()
+            .checked_div(total_requests)
+            .unwrap_or(0);
         let min_response_size = response_sizes.iter().copied().min();
         let max_response_size = response_sizes.iter().copied().max();
+
+        let requests_per_second = if total_time_secs > 0.0 {
+            total_requests as f64 / total_time_secs
+        } else {
+            0.0
+        };
 
         Statistics {
             response_time: Metrics(vec![
@@ -804,13 +804,9 @@ footer{{text-align:center;color:#94a3b8;font-size:.75rem;padding:24px 0}}
                 },
                 Entry {
                     label: "⏳ Requests Per Second (RPS)",
-                    value: if total_time_secs > 0.0 {
-                        format!("{:.02} / sec", total_requests as f64 / total_time_secs)
-                    } else {
-                        "0 / sec".to_string()
-                    },
+                    value: format!("{:.02} / sec", requests_per_second),
                     json_label: "requestsPerSecond",
-                    json_value: json!(total_requests as f64 / total_time_secs),
+                    json_value: json!(requests_per_second),
                 },
                 Entry {
                     label: "📊 Slow Request Percentage",
@@ -844,25 +840,8 @@ footer{{text-align:center;color:#94a3b8;font-size:.75rem;padding:24px 0}}
         }
     }
 
-    /// Filters and retrieves the slowest HTTP responses from the report.
-    ///
-    /// This function identifies HTTP responses with a response time exceeding the specified
-    /// threshold and sorts them in descending order of their response times. The output is
-    /// limited to the specified number of responses.
-    ///
-    /// # Arguments
-    ///
-    /// * `threshold` - A `f64` value (measured in seconds) that represents the minimum
-    ///   response time used to filter responses. Only responses with a `response_time`
-    ///   greater than this value will be included.
-    /// * `limit` - An `i32` value representing the maximum number of slow responses to include
-    ///   in the resulting vector.
-    ///
-    /// # Returns
-    ///
-    /// A `Vec<Response>` containing at most `limit` responses sorted by `response_time`
-    /// in descending order. Each response in the vector has a `response_time` greater
-    /// than the given threshold.
+    /// Returns at most `limit` responses whose response time is at least `threshold`
+    /// (in seconds), sorted by response time in descending order.
     fn slowest_responses(&self, threshold: f64, limit: u32) -> Vec<Response> {
         let mut responses: Vec<_> = self
             .responses
@@ -870,28 +849,12 @@ footer{{text-align:center;color:#94a3b8;font-size:.75rem;padding:24px 0}}
             .filter(|r| r.response_time.as_secs_f64() >= threshold)
             .cloned()
             .collect();
-        responses.sort_unstable_by(|a, b| b.response_time.cmp(&a.response_time));
+        responses.sort_unstable_by_key(|r| Reverse(r.response_time));
         responses.into_iter().take(limit as usize).collect()
     }
 
-    /// Filters and returns a sorted list of error responses from the report.
-    ///
-    /// # Description
-    /// This function processes the `responses` field of the `Report` struct to extract
-    /// all responses whose HTTP status codes indicate either client errors (4xx)
-    /// or server errors (5xx). The resulting list is then sorted primarily by
-    /// status code in descending order, and secondarily by URL in ascending order.
-    ///
-    /// # Returns
-    /// A `Vec<Response>` containing the filtered and sorted error responses.
-    ///
-    /// # Sorting
-    /// 1. **Primary**: Status code (descending).
-    /// 2. **Secondary**: URL (ascending).
-    ///
-    /// # See Also
-    /// `Response` - Contains details about individual HTTP requests, such as the
-    /// URL, status code, response time, etc.
+    /// Returns all responses with a 4xx or 5xx status code, sorted by
+    /// status code (descending), then URL (ascending).
     fn error_responses(&self) -> Vec<Response> {
         let mut responses: Vec<_> = self
             .responses

@@ -48,6 +48,8 @@ cargo install siteprobe
 
 ### Build from source
 
+Building from source requires Rust 1.86 or newer.
+
 ```sh
 git clone https://github.com/bartTC/siteprobe.git
 cd siteprobe
@@ -99,7 +101,7 @@ Options:
           Default timeout (in seconds) for each request [default: 10]
       --user-agent <USER_AGENT>
           Custom User-Agent header to be used in requests [default: "Mozilla/5.0
-          (compatible; Siteprobe/1.3.0)"]
+          (compatible; Siteprobe/1.4.0)"]
       --slow-num <SLOW_NUM>
           Limit the number of slow documents displayed in the report. [default:
           100]

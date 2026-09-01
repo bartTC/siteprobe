@@ -1,6 +1,6 @@
 use prettytable::{Cell, Row, Table};
 use serde_json::json;
-use siteprobe::metrics::{Entry, Metrics, CLEAN_FORMAT};
+use siteprobe::metrics::{CLEAN_FORMAT, Entry, Metrics};
 
 #[test]
 fn test_visual_alignment() {

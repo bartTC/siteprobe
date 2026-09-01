@@ -1,31 +1,28 @@
-mod metrics;
-mod network;
-mod options;
-mod report;
-mod sitemap;
-mod storage;
-mod utils;
-
 use std::error::Error;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use crate::sitemap::{fetch_and_generate_report, get_sitemap_urls};
-use clap::Parser;
+use clap::{CommandFactory, FromArgMatches};
 use console::style;
 use tokio::time::Instant;
 
+use siteprobe::network;
+use siteprobe::options::{Cli, ConfigFile};
+use siteprobe::sitemap::{fetch_and_generate_report, get_sitemap_urls};
+
 #[tokio::main]
 async fn main() -> Result<ExitCode, Box<dyn Error>> {
-    // Parse terminal arguments.
-    let mut options = options::Cli::parse();
+    // Parse terminal arguments. Keep the raw matches around so config merging
+    // can tell which options were explicitly set on the command line.
+    let matches = Cli::command().get_matches();
+    let mut options = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
 
     // Load config file and apply values (CLI args take priority).
-    let config = options::ConfigFile::load(options.config.as_ref()).unwrap_or_else(|e| {
+    let config = ConfigFile::load(options.config.as_deref()).unwrap_or_else(|e| {
         eprintln!("{} {}", style("[ERROR]").red(), e);
         std::process::exit(1);
     });
-    options.apply_config(&config);
+    options.apply_config(&config, &matches);
 
     // Build the HTTP client.
     let client = Arc::new(network::build_client(&options)?);
