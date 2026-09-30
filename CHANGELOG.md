@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-09-30
+
 ### Fixed
 
 - A `SOURCE` URL that answers with a redirect now fails with an error naming
@@ -211,7 +213,8 @@ stability and maturity, making it suitable for a v1.0 release.
 
 - Initial release with all core features.
 
-[unreleased]: https://github.com/bartTC/siteprobe/compare/v1.5.0...HEAD
+[unreleased]: https://github.com/bartTC/siteprobe/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/bartTC/siteprobe/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/bartTC/siteprobe/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/bartTC/siteprobe/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/bartTC/siteprobe/compare/v1.2.2...v1.3.0

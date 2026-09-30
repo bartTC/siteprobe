@@ -138,7 +138,7 @@ Options:
           Default timeout (in seconds) for each request [default: 10]
       --user-agent <USER_AGENT>
           Custom User-Agent header to be used in requests [default: "Mozilla/5.0
-          (compatible; Siteprobe/1.5.0)"]
+          (compatible; Siteprobe/1.5.1)"]
       --slow-num <SLOW_NUM>
           Limit the number of slow documents displayed in the report. [default:
           100]
@@ -222,7 +222,7 @@ retries = 0                    # retries for network errors and 5xx responses
 follow_redirects = false       # follow up to 10 redirects
 append_timestamp = false       # append a random timestamp to each URL to bypass caches
 # rate_limit = "300/5m"        # requests per time span; units: s, m, h
-# user_agent = "Mozilla/5.0 (compatible; Siteprobe/1.5.0)"   # the default carries the version
+# user_agent = "Mozilla/5.0 (compatible; Siteprobe/1.5.1)"   # the default carries the version
 
 # Authentication
 # basic_auth = "user:password"
