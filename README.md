@@ -166,10 +166,10 @@ Options:
   -V, --version
           Print version
 
-EXIT CODES:
-0  All URLs returned 2xx (success)
-1  One or more URLs returned 4xx/5xx or failed
-2  One or more URLs exceeded the slow threshold (--slow-threshold)
+Exit Codes:
+  0  All URLs returned 2xx (success)
+  1  One or more URLs returned 4xx/5xx or failed
+  2  One or more URLs exceeded the slow threshold (--slow-threshold)
 ```
 
 ### Authentication & Custom Headers

@@ -1,4 +1,5 @@
 use crate::utils::{is_http_url, validate_basic_auth};
+use clap::builder::styling::Style;
 use clap::parser::ValueSource;
 use clap::{ArgGroup, ArgMatches, Parser, ValueHint};
 use serde::Deserialize;
@@ -189,17 +190,26 @@ pub fn parse_target_url(s: &str) -> Result<Url, String> {
     Ok(url)
 }
 
+/// Builds the trailing help section. The heading uses the same bold and
+/// underlined style clap applies to its own "Arguments:" and "Options:"
+/// headings; clap strips the escape codes when colors are disabled.
+fn after_help() -> String {
+    let header = Style::new().bold().underline();
+    format!(
+        "{header}Exit Codes:{header:#}\n\
+         \x20 0  All URLs returned 2xx (success)\n\
+         \x20 1  One or more URLs returned 4xx/5xx or failed\n\
+         \x20 2  One or more URLs exceeded the slow threshold (--slow-threshold)"
+    )
+}
+
 #[derive(Debug, Parser)]
 #[command(
     term_width = 80,
     version,
     // At least one of SOURCE or --url is required; both may be combined.
     group(ArgGroup::new("input").required(true).multiple(true).args(["source", "urls"])),
-    after_help = "\
-EXIT CODES:\n\
-    0  All URLs returned 2xx (success)\n\
-    1  One or more URLs returned 4xx/5xx or failed\n\
-    2  One or more URLs exceeded the slow threshold (--slow-threshold)"
+    after_help = after_help()
 )]
 pub struct Cli {
     #[arg(
