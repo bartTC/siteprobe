@@ -17,6 +17,14 @@
   `URLs from the command line`. The JSON key itself is unchanged.
 - Status output names the detected format in words (`sitemap index`,
   `sitemap`, `URL list`) instead of the internal enum variant name.
+- Added `--exit-zero` (config file: `exit_zero = true`) to always exit with
+  status code 0 after a completed run, even if URLs failed or exceeded the
+  slow threshold. Fatal errors, such as an unreadable source, and invalid
+  arguments still exit non-zero.
+- **Breaking:** the exit code for slow responses (`--slow-threshold`) changed
+  from `2` to `3`. Exit code `2` was already used for invalid command line
+  arguments, so scripts could not tell the two cases apart. Update any CI
+  checks that test for `2`.
 
 ## v1.4.0 (2026-09-01)
 

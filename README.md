@@ -155,6 +155,10 @@ Options:
       --retries <RETRIES>
           Number of retries for failed requests (network errors or 5xx
           responses) [default: 0]
+      --exit-zero
+          Always exit with status code 0 after a completed run, even if URLs
+          failed or exceeded the slow threshold. Fatal errors, such as an
+          unreadable source, still exit non-zero.
       --json
           Output the JSON report to stdout instead of the normal table output.
           Suppresses all other console output for clean piping.
@@ -168,8 +172,33 @@ Options:
 
 Exit Codes:
   0  All URLs returned 2xx (success)
-  1  One or more URLs returned 4xx/5xx or failed
-  2  One or more URLs exceeded the slow threshold (--slow-threshold)
+  1  One or more URLs returned 4xx/5xx or failed, or a fatal error occurred
+  2  Invalid command line arguments
+  3  One or more URLs exceeded the slow threshold (--slow-threshold)
+
+Use --exit-zero to always exit 0 after a completed run.
+```
+
+### Exit Codes
+
+The exit code summarizes the run, so siteprobe can gate a CI pipeline:
+
+| Code | Meaning                                                                                     |
+|------|---------------------------------------------------------------------------------------------|
+| `0`  | All URLs returned 2xx.                                                                      |
+| `1`  | One or more URLs returned 4xx/5xx or failed, or a fatal error occurred (e.g. the source could not be loaded). |
+| `2`  | Invalid command line arguments.                                                             |
+| `3`  | One or more URLs exceeded the `--slow-threshold`.                                           |
+
+A run with both failing and slow URLs exits with `1`.
+
+Pass `--exit-zero` (or set `exit_zero = true` in `.siteprobe.toml`) to always exit
+with `0` after a completed run, for example when only the report matters and
+failing URLs should not fail the job. Fatal errors and invalid arguments still
+exit non-zero.
+
+```sh
+siteprobe https://example.com/sitemap.xml --report-path-html report.html --exit-zero
 ```
 
 ### Authentication & Custom Headers

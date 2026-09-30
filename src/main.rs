@@ -60,5 +60,11 @@ async fn main() -> Result<ExitCode, Box<dyn Error>> {
         report.write_html_report(&options, path)?;
     }
 
+    // --exit-zero only neutralizes result-driven failures. Errors that abort
+    // the run (unreadable source, invalid arguments) still exit non-zero above.
+    if options.exit_zero {
+        return Ok(ExitCode::SUCCESS);
+    }
+
     Ok(report.exit_code(options.slow_threshold))
 }

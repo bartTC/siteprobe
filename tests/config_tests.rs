@@ -27,6 +27,7 @@ basic_auth = "user:pass"
 follow_redirects = true
 append_timestamp = true
 retries = 3
+exit_zero = true
 report_path = "/tmp/report.csv"
 report_path_json = "/tmp/report.json"
 report_path_html = "/tmp/report.html"
@@ -45,6 +46,7 @@ headers = ["Authorization: Bearer token123", "X-Custom: value"]
     assert_eq!(config.follow_redirects, Some(true));
     assert_eq!(config.append_timestamp, Some(true));
     assert_eq!(config.retries, Some(3));
+    assert_eq!(config.exit_zero, Some(true));
     assert_eq!(config.report_path.as_deref(), Some("/tmp/report.csv"));
     assert_eq!(config.report_path_json.as_deref(), Some("/tmp/report.json"));
     assert_eq!(config.report_path_html.as_deref(), Some("/tmp/report.html"));
@@ -161,6 +163,7 @@ fn test_apply_config_all_fields() {
         follow_redirects: Some(true),
         append_timestamp: Some(true),
         retries: Some(5),
+        exit_zero: Some(true),
         report_path: Some("/tmp/r.csv".to_string()),
         report_path_json: Some("/tmp/r.json".to_string()),
         report_path_html: Some("/tmp/r.html".to_string()),
@@ -180,6 +183,7 @@ fn test_apply_config_all_fields() {
     assert!(cli.follow_redirects);
     assert!(cli.append_timestamp);
     assert_eq!(cli.retries, 5);
+    assert!(cli.exit_zero);
     assert!(cli.report_path.is_some());
     assert!(cli.report_path_json.is_some());
     assert!(cli.report_path_html.is_some());

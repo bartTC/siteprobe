@@ -599,8 +599,11 @@ footer{{text-align:center;color:#94a3b8;font-size:.75rem;padding:24px 0}}
     /// Determines the appropriate process exit code based on response results.
     ///
     /// - `0` — All URLs returned 2xx (success).
-    /// - `1` — One or more URLs returned 4xx/5xx (errors). Takes priority over slow.
-    /// - `2` — One or more URLs exceeded the slow threshold (when `--slow-threshold` is set).
+    /// - `1` — One or more URLs returned 4xx/5xx (including mapped network
+    ///   failures). Takes priority over slow.
+    /// - `3` — One or more URLs exceeded the slow threshold (when `--slow-threshold` is set).
+    ///
+    /// Exit code `2` is not used here; clap reserves it for usage errors.
     pub fn exit_code(&self, slow_threshold: Option<f64>) -> ExitCode {
         let has_errors = self
             .responses
@@ -617,7 +620,7 @@ footer{{text-align:center;color:#94a3b8;font-size:.75rem;padding:24px 0}}
                 .iter()
                 .any(|r| r.response_time.as_secs_f64() > threshold);
             if has_slow {
-                return ExitCode::from(2);
+                return ExitCode::from(3);
             }
         }
 

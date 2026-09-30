@@ -198,8 +198,11 @@ fn after_help() -> String {
     format!(
         "{header}Exit Codes:{header:#}\n\
          \x20 0  All URLs returned 2xx (success)\n\
-         \x20 1  One or more URLs returned 4xx/5xx or failed\n\
-         \x20 2  One or more URLs exceeded the slow threshold (--slow-threshold)"
+         \x20 1  One or more URLs returned 4xx/5xx or failed, or a fatal error occurred\n\
+         \x20 2  Invalid command line arguments\n\
+         \x20 3  One or more URLs exceeded the slow threshold (--slow-threshold)\n\
+         \n\
+         Use --exit-zero to always exit 0 after a completed run."
     )
 }
 
@@ -353,6 +356,13 @@ pub struct Cli {
 
     #[arg(
         long,
+        help = "Always exit with status code 0 after a completed run, even if URLs failed or exceeded the slow threshold. Fatal errors, such as an unreadable source, still exit non-zero.",
+        default_value = "false"
+    )]
+    pub exit_zero: bool,
+
+    #[arg(
+        long,
         help = "Output the JSON report to stdout instead of the normal table output. Suppresses all other console output for clean piping.",
         default_value = "false"
     )]
@@ -381,6 +391,7 @@ pub struct ConfigFile {
     pub follow_redirects: Option<bool>,
     pub append_timestamp: Option<bool>,
     pub retries: Option<u8>,
+    pub exit_zero: Option<bool>,
     pub report_path: Option<String>,
     pub report_path_json: Option<String>,
     pub report_path_html: Option<String>,
@@ -494,6 +505,11 @@ impl Cli {
         if let Some(v) = config.retries {
             if !arg_provided(matches, "retries") {
                 self.retries = v;
+            }
+        }
+        if let Some(v) = config.exit_zero {
+            if !arg_provided(matches, "exit_zero") {
+                self.exit_zero = v;
             }
         }
         if let Some(ref v) = config.report_path {
