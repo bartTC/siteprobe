@@ -73,13 +73,27 @@ release:
     cargo test
     echo "Tests passed."
 
-    # 3. Update changelog: replace WIP with today's date
+    # 3. Update changelog (Keep a Changelog format): turn the [Unreleased]
+    #    section into this release and add its compare link.
     today=$(date +%Y-%m-%d)
-    if grep -q "WIP" CHANGELOG.md; then
-        sed -i '' "s/WIP/$today/g" CHANGELOG.md
-        echo "Updated CHANGELOG.md: WIP → $today"
+    if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
+        awk -v ver="{{version}}" -v date="$today" -v repo="{{repo}}" '
+            /^## \[Unreleased\]$/ {
+                print; print ""; print "## [" ver "] - " date; next
+            }
+            /^\[unreleased\]: / {
+                prev = $0
+                sub(/.*\/compare\//, "", prev)
+                sub(/\.\.\.HEAD$/, "", prev)
+                print "[unreleased]: https://github.com/" repo "/compare/v" ver "...HEAD"
+                print "[" ver "]: https://github.com/" repo "/compare/" prev "...v" ver
+                next
+            }
+            { print }
+        ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+        echo "Updated CHANGELOG.md: [Unreleased] → [{{version}}] - $today"
     else
-        echo "No WIP found in CHANGELOG.md, skipping."
+        echo "No [Unreleased] section found in CHANGELOG.md, skipping."
     fi
 
     # 4. Create commit
