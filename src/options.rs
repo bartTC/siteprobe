@@ -1,7 +1,8 @@
-use crate::utils::validate_basic_auth;
+use crate::utils::{is_http_url, validate_basic_auth};
 use clap::parser::ValueSource;
-use clap::{ArgMatches, Parser, ValueHint, value_parser};
+use clap::{ArgGroup, ArgMatches, Parser, ValueHint};
 use serde::Deserialize;
+use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 use url::Url;
@@ -129,10 +130,71 @@ fn parse_slow_threshold(value: &str) -> Result<f64, String> {
     Ok(parsed)
 }
 
+/// Where the list of URLs to probe is loaded from. The content may be a
+/// `sitemap.xml`, a sitemap index, or a plain-text list with one URL per line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UrlSource {
+    /// Fetched over HTTP(S).
+    Remote(Url),
+    /// Read from a local file.
+    File(PathBuf),
+    /// Read from standard input (`-`).
+    Stdin,
+}
+
+impl fmt::Display for UrlSource {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            UrlSource::Remote(url) => write!(f, "{url}"),
+            UrlSource::File(path) => write!(f, "{}", path.display()),
+            UrlSource::Stdin => write!(f, "stdin"),
+        }
+    }
+}
+
+/// Parses the positional `SOURCE` argument: `-` for stdin, an http(s) URL,
+/// a `file://` URL, or the path of an existing local file.
+pub fn parse_url_source(s: &str) -> Result<UrlSource, String> {
+    if s == "-" {
+        return Ok(UrlSource::Stdin);
+    }
+
+    let path = match Url::parse(s) {
+        Ok(url) if is_http_url(&url) => return Ok(UrlSource::Remote(url)),
+        Ok(url) if url.scheme() == "file" => url
+            .to_file_path()
+            .map_err(|_| format!("'{}' is not a valid file URL", s))?,
+        // Anything else (including a parse error) is treated as a local path.
+        // Bare paths are not valid absolute URLs, and Windows drive letters
+        // parse as a single-letter scheme.
+        _ => expand_path(s)?,
+    };
+
+    if path.is_file() {
+        Ok(UrlSource::File(path))
+    } else {
+        Err(format!(
+            "'{}' is neither an http(s) URL, an existing file, nor '-' for stdin",
+            s
+        ))
+    }
+}
+
+/// Validates a `--url` value: it must be an absolute http(s) URL.
+pub fn parse_target_url(s: &str) -> Result<Url, String> {
+    let url = Url::parse(s).map_err(|e| format!("'{}' is not a valid URL: {}", s, e))?;
+    if !is_http_url(&url) {
+        return Err(format!("'{}' must use the http or https scheme", s));
+    }
+    Ok(url)
+}
+
 #[derive(Debug, Parser)]
 #[command(
     term_width = 80,
     version,
+    // At least one of SOURCE or --url is required; both may be combined.
+    group(ArgGroup::new("input").required(true).multiple(true).args(["source", "urls"])),
     after_help = "\
 EXIT CODES:\n\
     0  All URLs returned 2xx (success)\n\
@@ -141,11 +203,21 @@ EXIT CODES:\n\
 )]
 pub struct Cli {
     #[arg(
-        help = "The URL of the sitemap to be fetched and processed.",
-        value_hint = ValueHint::Url,
-        value_parser = value_parser!(Url)
+        help = "Where to load the URLs from: a sitemap.xml or a plain-text list with one URL per line, given as an http(s) URL, a local file path, or '-' to read from stdin. Optional if --url is used.",
+        value_name = "SOURCE",
+        value_parser = parse_url_source
     )]
-    pub sitemap_url: Url,
+    pub source: Option<UrlSource>,
+
+    #[arg(
+        short = 'u',
+        long = "url",
+        help = "A URL to probe directly, without loading a sitemap or list. Can be specified multiple times and combined with SOURCE.",
+        value_name = "URL",
+        value_hint = ValueHint::Url,
+        value_parser = parse_target_url
+    )]
+    pub urls: Vec<Url>,
 
     #[arg(
         long,
@@ -349,6 +421,15 @@ fn arg_provided(matches: &ArgMatches, id: &str) -> bool {
 }
 
 impl Cli {
+    /// Describes where the probed URLs came from, for the report headline.
+    pub fn source_label(&self) -> String {
+        match &self.source {
+            Some(UrlSource::Stdin) => "URLs from stdin".to_string(),
+            Some(source) => source.to_string(),
+            None => "URLs from the command line".to_string(),
+        }
+    }
+
     /// Merge config file values into the CLI options.
     /// CLI arguments take priority over config file values.
     pub fn apply_config(&mut self, config: &ConfigFile, matches: &ArgMatches) {

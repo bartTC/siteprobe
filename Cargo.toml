@@ -1,11 +1,11 @@
 [package]
 name = "siteprobe"
-version = "1.4.0"
+version = "1.5.0"
 license = "MIT"
 edition = "2024"
 rust-version = "1.86"
 authors = ["Martin Mahner <martin@elephant.house>"]
-description = "CLI tool to fetch URLs from sitemap.xml, check their existence, and generate performance reports"
+description = "CLI tool to fetch URLs from a sitemap.xml or a plain list of URLs, check their existence, and generate performance reports"
 repository = "https://github.com/bartTC/siteprobe"
 homepage = "https://barttc.github.io/siteprobe/"
 readme = "README.md"

@@ -1,5 +1,6 @@
 use siteprobe::sitemap::{
-    SitemapType, decompress_gzip, extract_sitemap_urls, identify_sitemap_type, is_gzip_content,
+    SitemapType, UrlList, decompress_gzip, extract_sitemap_urls, identify_sitemap_type,
+    is_gzip_content, parse_url_list,
 };
 
 // ===========================================================================================
@@ -409,4 +410,115 @@ fn test_gzip_roundtrip_sitemap_index() {
     assert_eq!(urls.len(), 2);
     assert_eq!(urls[0], "http://www.example.com/sitemap1.xml.gz");
     assert_eq!(urls[1], "http://www.example.com/sitemap2.xml.gz");
+}
+
+// ===========================================================================================
+// parse_url_list Tests
+// ===========================================================================================
+
+#[test]
+fn test_parse_url_list_basic() {
+    let text = "\
+# Pages to check
+https://example.com/
+
+  https://example.com/about  
+http://example.com/contact?x=1&y=2
+";
+    let list = parse_url_list(text);
+    assert_eq!(
+        list.urls,
+        vec![
+            "https://example.com/",
+            "https://example.com/about",
+            "http://example.com/contact?x=1&y=2",
+        ]
+    );
+    assert!(list.invalid_lines.is_empty());
+}
+
+#[test]
+fn test_parse_url_list_normalizes_urls() {
+    // A bare host gains a trailing slash and the host is lowercased, so the
+    // value matches what `--url` produces for the same input.
+    let list = parse_url_list("https://Example.COM\nhttps://example.com/Path");
+    assert_eq!(
+        list.urls,
+        vec!["https://example.com/", "https://example.com/Path"]
+    );
+}
+
+#[test]
+fn test_parse_url_list_collects_invalid_lines() {
+    let text = "https://example.com/\nnot a url\nftp://example.com/file\nmailto:a@b.c\n";
+    let list = parse_url_list(text);
+    assert_eq!(list.urls, vec!["https://example.com/"]);
+    assert_eq!(
+        list.invalid_lines,
+        vec!["not a url", "ftp://example.com/file", "mailto:a@b.c"]
+    );
+}
+
+#[test]
+fn test_parse_url_list_handles_crlf() {
+    let list = parse_url_list("https://example.com/\r\nhttps://example.com/a\r\n");
+    assert_eq!(
+        list.urls,
+        vec!["https://example.com/", "https://example.com/a"]
+    );
+    assert!(list.invalid_lines.is_empty());
+}
+
+#[test]
+fn test_parse_url_list_empty() {
+    assert_eq!(parse_url_list(""), UrlList::default());
+    assert_eq!(parse_url_list("\n\n# nothing\n"), UrlList::default());
+}
+
+// ===========================================================================================
+// identify_sitemap_type: plain text detection
+// ===========================================================================================
+
+#[test]
+fn test_identify_sitemap_type_plain_text() {
+    let text = "# list\nhttps://example.com/\nhttps://example.com/about\n";
+    assert_eq!(identify_sitemap_type(text), SitemapType::PlainText);
+}
+
+#[test]
+fn test_identify_sitemap_type_plain_text_with_some_invalid_lines() {
+    let text = "https://example.com/\noops\n";
+    assert_eq!(identify_sitemap_type(text), SitemapType::PlainText);
+}
+
+#[test]
+fn test_identify_sitemap_type_text_without_urls_is_unknown() {
+    assert_eq!(identify_sitemap_type("Not Found"), SitemapType::Unknown);
+    assert_eq!(
+        identify_sitemap_type("just\nsome\nwords"),
+        SitemapType::Unknown
+    );
+}
+
+#[test]
+fn test_identify_sitemap_type_html_is_unknown() {
+    // An HTML error page contains URLs inside markup, but no bare URL lines.
+    let html = "<!DOCTYPE html>\n<html><body><a href=\"https://example.com/\">x</a></body></html>";
+    assert_eq!(identify_sitemap_type(html), SitemapType::Unknown);
+}
+
+#[test]
+fn test_identify_sitemap_type_unknown_xml_root_is_not_treated_as_text() {
+    // XML with a foreign root element must stay Unknown even if a line
+    // happens to look URL-ish.
+    let xml = "<rss>\nhttps://example.com/\n</rss>";
+    assert_eq!(identify_sitemap_type(xml), SitemapType::Unknown);
+}
+
+#[test]
+fn test_sitemap_type_display() {
+    assert_eq!(SitemapType::SitemapIndex.to_string(), "sitemap index");
+    assert_eq!(SitemapType::UrlSet.to_string(), "sitemap");
+    assert_eq!(SitemapType::PlainText.to_string(), "URL list");
+    assert_eq!(SitemapType::Unknown.to_string(), "unknown document");
 }

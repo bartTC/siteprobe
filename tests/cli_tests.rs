@@ -16,10 +16,8 @@ fn test_cli_help() {
     assert!(stdout.contains("Usage:"), "Help should show usage");
     assert!(stdout.contains("Arguments:"), "Help should show arguments");
     assert!(stdout.contains("Options:"), "Help should show options");
-    assert!(
-        stdout.contains("SITEMAP_URL"),
-        "Help should mention sitemap URL"
-    );
+    assert!(stdout.contains("SOURCE"), "Help should mention SOURCE");
+    assert!(stdout.contains("--url"), "Help should document --url");
 
     // Verify key options are documented
     assert!(
@@ -97,7 +95,7 @@ fn test_cli_version_short() {
 
 #[test]
 fn test_cli_missing_required_argument() {
-    // Test running without required sitemap URL
+    // Test running without a source or any --url
     let output = Command::new("cargo")
         .args(["run", "--quiet", "--"])
         .output()
@@ -112,7 +110,7 @@ fn test_cli_missing_required_argument() {
 
     // Should mention the missing argument
     assert!(
-        stderr.contains("required") || stderr.contains("SITEMAP_URL"),
+        stderr.contains("required") || stderr.contains("SOURCE"),
         "Error should mention required argument"
     );
 }

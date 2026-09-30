@@ -32,7 +32,7 @@ pub struct Response {
 
 #[derive(Debug)]
 pub struct Report {
-    pub sitemap_url: String,
+    pub source: String,
     pub concurrency_limit: u8,
     pub rate_limit: Option<u32>,
     pub total_time: Duration,
@@ -85,7 +85,7 @@ impl Report {
         println!(
             "\n\n{} {}\n",
             style("Statistics for").bold(),
-            style(&self.sitemap_url).bold().underlined()
+            style(&self.source).bold().underlined()
         );
 
         let mut table = Table::new();
@@ -155,7 +155,7 @@ impl Report {
         json!(
             {
                "config": {
-                    "sitemapUrl": self.sitemap_url,
+                    "sitemapUrl": self.source,
                     "concurrencyLimit": self.concurrency_limit,
                     "elapsedTime": self.total_time.as_millis(),
                     "bypassCaching": options.append_timestamp,
@@ -438,7 +438,7 @@ impl Report {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Siteprobe Report — {sitemap_url}</title>
+<title>Siteprobe Report — {source}</title>
 <style>
 *,*::before,*::after{{box-sizing:border-box}}
 body{{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f8fafc;color:#1e293b;line-height:1.6}}
@@ -477,7 +477,7 @@ footer{{text-align:center;color:#94a3b8;font-size:.75rem;padding:24px 0}}
 <body>
 <div class="container">
 <h1>Siteprobe Report</h1>
-<p class="subtitle">{sitemap_url} &mdash; {elapsed}</p>
+<p class="subtitle">{source} &mdash; {elapsed}</p>
 
 <div class="cards">
   <div class="card"><div class="label">Total Requests</div><div class="value">{total}</div></div>
@@ -562,7 +562,7 @@ footer{{text-align:center;color:#94a3b8;font-size:.75rem;padding:24px 0}}
 </script>
 </body>
 </html>"##,
-            sitemap_url = html_escape(&self.sitemap_url),
+            source = html_escape(&self.source),
             elapsed = format!("{:.2?}", self.total_time),
             total = total_requests,
             rps = rps,

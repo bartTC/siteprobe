@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.5.0 (WIP)
+
+- Added plain-text URL lists as an alternative to `sitemap.xml`: one URL per
+  line, blank lines and lines starting with `#` are ignored. The format is
+  detected automatically, so any source may be a sitemap, a sitemap index,
+  or a plain list. Lines that are not http(s) URLs are skipped with a warning.
+- The positional `SOURCE` argument now also accepts a local file path or `-`
+  to read from stdin, in addition to an http(s) URL. This works for sitemaps
+  and URL lists alike, e.g. `curl -s https://example.com/sitemap.xml | siteprobe -`.
+- Added `-u/--url <URL>` to probe individual URLs directly, without loading a
+  sitemap or list. It can be repeated and combined with `SOURCE`; the URLs
+  are merged and deduplicated. `SOURCE` is optional when `--url` is given.
+- The report headline and the `sitemapUrl` field in the JSON report now show
+  where the URLs came from: the URL or file path, `URLs from stdin`, or
+  `URLs from the command line`. The JSON key itself is unchanged.
+- Status output names the detected format in words (`sitemap index`,
+  `sitemap`, `URL list`) instead of the internal enum variant name.
+
 ## v1.4.0 (2026-09-01)
 
 Maintenance release. No new features, but a couple of fixes, internal

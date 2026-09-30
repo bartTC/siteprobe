@@ -1,5 +1,7 @@
-use siteprobe::options::parse_rate_limit;
+use siteprobe::options::{UrlSource, parse_rate_limit, parse_target_url, parse_url_source};
+use std::io::Write;
 use std::process::Command;
+use url::Url;
 
 #[test]
 fn test_parse_rate_limit_valid_inputs() {
@@ -183,4 +185,104 @@ fn test_slow_threshold_negative_via_cli() {
         "Expected validation error, got: {}",
         stderr
     );
+}
+
+// ===========================================================================================
+// parse_url_source Tests
+// ===========================================================================================
+
+fn temp_file() -> tempfile::NamedTempFile {
+    let mut file = tempfile::Builder::new()
+        .prefix("siteprobe_options_test_")
+        .suffix(".txt")
+        .tempfile()
+        .expect("Failed to create temp file");
+    file.write_all(b"https://example.com/\n")
+        .expect("Failed to write temp file");
+    file
+}
+
+#[test]
+fn test_parse_url_source_dash_is_stdin() {
+    assert_eq!(parse_url_source("-"), Ok(UrlSource::Stdin));
+}
+
+#[test]
+fn test_parse_url_source_http_urls_are_remote() {
+    assert_eq!(
+        parse_url_source("https://example.com/sitemap.xml"),
+        Ok(UrlSource::Remote(
+            Url::parse("https://example.com/sitemap.xml").unwrap()
+        ))
+    );
+    assert_eq!(
+        parse_url_source("http://localhost:8000/urls.txt"),
+        Ok(UrlSource::Remote(
+            Url::parse("http://localhost:8000/urls.txt").unwrap()
+        ))
+    );
+}
+
+#[test]
+fn test_parse_url_source_existing_file() {
+    let file = temp_file();
+    let result = parse_url_source(file.path().to_str().unwrap());
+    assert_eq!(result, Ok(UrlSource::File(file.path().to_path_buf())));
+}
+
+#[test]
+fn test_parse_url_source_file_url() {
+    let file = temp_file();
+    let file_url = Url::from_file_path(file.path()).unwrap();
+    let result = parse_url_source(file_url.as_str());
+    assert_eq!(result, Ok(UrlSource::File(file.path().to_path_buf())));
+}
+
+#[test]
+fn test_parse_url_source_missing_file_is_an_error() {
+    let result = parse_url_source("/definitely/not/here/urls.txt");
+    let err = result.expect_err("missing file should be rejected");
+    assert!(err.contains("neither an http(s) URL"), "{}", err);
+}
+
+#[test]
+fn test_parse_url_source_directory_is_an_error() {
+    let dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let result = parse_url_source(dir.path().to_str().unwrap());
+    assert!(result.is_err(), "a directory is not a valid source");
+}
+
+#[test]
+fn test_parse_url_source_scheme_less_url_is_an_error() {
+    // Without a scheme this is treated as a path, which does not exist.
+    let result = parse_url_source("example.com/sitemap.xml");
+    assert!(result.is_err());
+}
+
+// ===========================================================================================
+// parse_target_url Tests
+// ===========================================================================================
+
+#[test]
+fn test_parse_target_url_valid() {
+    assert_eq!(
+        parse_target_url("https://example.com/about"),
+        Ok(Url::parse("https://example.com/about").unwrap())
+    );
+    assert_eq!(
+        parse_target_url("http://example.com"),
+        Ok(Url::parse("http://example.com/").unwrap())
+    );
+}
+
+#[test]
+fn test_parse_target_url_rejects_other_schemes() {
+    let err = parse_target_url("ftp://example.com/file").expect_err("ftp should be rejected");
+    assert!(err.contains("http or https"), "{}", err);
+}
+
+#[test]
+fn test_parse_target_url_rejects_relative_urls() {
+    let err = parse_target_url("/about").expect_err("relative URL should be rejected");
+    assert!(err.contains("not a valid URL"), "{}", err);
 }

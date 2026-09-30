@@ -13,7 +13,7 @@ fn make_response(status: u16, response_time_ms: u64) -> Response {
 
 fn make_report(responses: Vec<Response>) -> Report {
     Report {
-        sitemap_url: "https://example.com/sitemap.xml".to_string(),
+        source: "https://example.com/sitemap.xml".to_string(),
         concurrency_limit: 1,
         rate_limit: None,
         total_time: Duration::from_secs(1),

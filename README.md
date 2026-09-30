@@ -1,8 +1,9 @@
 # Siteprobe
 
 Siteprobe is a Rust-based CLI tool that fetches all URLs from a given `sitemap.xml`
-url, checks their existence, and generates a performance report. It supports various
-features such as authentication, concurrency control, caching bypass, and more.
+or a plain list of URLs, checks their existence, and generates a performance report.
+It supports various features such as authentication, concurrency control, caching
+bypass, and more.
 
 ![Screenshot of Siteprobe statistics](https://github.com/bartTC/siteprobe/blob/main/docs/screenshot.png?raw=true)
 
@@ -10,6 +11,8 @@ features such as authentication, concurrency control, caching bypass, and more.
 
 - Fetch and parse sitemap.xml to extract URLs, including nested Sitemap Index files
   recursively.
+- Alternatively read a plain-text list of URLs, from a URL, a local file, or stdin,
+  or pass individual URLs directly on the command line.
 - Check the existence and response times of each URL.
 - Generate a detailed performance CSV report.
 - Support for Basic Authentication.
@@ -59,22 +62,57 @@ cargo build --release
 ## Usage
 
 ```sh
-siteprobe <sitemap_url> [OPTIONS]
+siteprobe [SOURCE] [--url <URL>]... [OPTIONS]
 ```
 
 ### Arguments
 
-- `<sitemap_url>` - The URL of the sitemap to be fetched and processed.
+- `[SOURCE]` - Where to load the URLs from. Either a `sitemap.xml` (or sitemap
+  index) or a plain-text list with one URL per line, given as an http(s) URL, a
+  local file path, or `-` to read from stdin. The format is detected automatically.
+  Optional if `--url` is used.
+- `-u, --url <URL>` - A URL to probe directly. Can be repeated and combined with
+  `SOURCE`; all URLs are merged and deduplicated.
+
+### URL Sources
+
+Besides a `sitemap.xml`, siteprobe accepts a plain-text list of URLs. Blank lines
+and lines starting with `#` are ignored; lines that are not http(s) URLs are
+skipped with a warning.
+
+```sh
+# A sitemap or sitemap index
+siteprobe https://example.com/sitemap.xml
+
+# A plain-text URL list, remote or local
+siteprobe https://example.com/urls.txt
+siteprobe ./urls.txt
+
+# Read the list (or a sitemap) from stdin
+cat urls.txt | siteprobe -
+curl -s https://example.com/sitemap.xml | siteprobe -
+
+# Probe a handful of URLs directly
+siteprobe -u https://example.com/ -u https://example.com/about
+
+# Combine a source with extra URLs
+siteprobe https://example.com/sitemap.xml -u https://example.com/new-page
+```
 
 ### Options
 
 ```
-Usage: siteprobe [OPTIONS] <SITEMAP_URL>
+Usage: siteprobe [OPTIONS] <SOURCE|--url <URL>>
 
 Arguments:
-  <SITEMAP_URL>  The URL of the sitemap to be fetched and processed.
+  [SOURCE]  Where to load the URLs from: a sitemap.xml or a plain-text list with
+            one URL per line, given as an http(s) URL, a local file path, or '-'
+            to read from stdin. Optional if --url is used.
 
 Options:
+  -u, --url <URL>
+          A URL to probe directly, without loading a sitemap or list. Can be
+          specified multiple times and combined with SOURCE.
       --basic-auth <BASIC_AUTH>
           Basic authentication credentials in the format `username:password`
   -H, --header <HEADERS>
@@ -101,7 +139,7 @@ Options:
           Default timeout (in seconds) for each request [default: 10]
       --user-agent <USER_AGENT>
           Custom User-Agent header to be used in requests [default: "Mozilla/5.0
-          (compatible; Siteprobe/1.4.0)"]
+          (compatible; Siteprobe/1.5.0)"]
       --slow-num <SLOW_NUM>
           Limit the number of slow documents displayed in the report. [default:
           100]
@@ -172,4 +210,10 @@ siteprobe https://example.com/sitemap.xml --report-path ./results/report.csv --o
 
 # Set concurrency limit to 10 and timeout to 5 seconds
 siteprobe https://example.com/sitemap.xml --concurrency-limit 10 --request-timeout 5
+
+# Quickly check a few pages without a sitemap
+siteprobe -u https://example.com/ -u https://example.com/pricing --slow-threshold 1
+
+# Check the URLs listed in a local text file
+siteprobe ./urls.txt --report-path ./results/report.csv
 ```

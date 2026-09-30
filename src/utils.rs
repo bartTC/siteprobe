@@ -1,6 +1,12 @@
 use rand::RngExt;
 use std::time::Duration;
 use unicode_segmentation::UnicodeSegmentation;
+use url::Url;
+
+/// Returns true if the URL uses a scheme siteprobe can request (http or https).
+pub fn is_http_url(url: &Url) -> bool {
+    matches!(url.scheme(), "http" | "https")
+}
 
 /// Truncates a given string to a specified maximum width, appending an ellipsis (`…`)
 /// if the string exceeds the specified width. Handles Unicode grapheme clusters properly.

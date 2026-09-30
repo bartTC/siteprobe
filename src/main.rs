@@ -8,7 +8,7 @@ use tokio::time::Instant;
 
 use siteprobe::network;
 use siteprobe::options::{Cli, ConfigFile};
-use siteprobe::sitemap::{fetch_and_generate_report, get_sitemap_urls};
+use siteprobe::sitemap::{collect_urls, fetch_and_generate_report};
 
 #[tokio::main]
 async fn main() -> Result<ExitCode, Box<dyn Error>> {
@@ -28,13 +28,11 @@ async fn main() -> Result<ExitCode, Box<dyn Error>> {
     let client = Arc::new(network::build_client(&options)?);
     let start_time = Instant::now();
 
-    // Fetch all URLs from the sitemap.
-    let urls = get_sitemap_urls(options.sitemap_url.as_str(), &client, options.json)
-        .await
-        .unwrap_or_else(|e| {
-            eprintln!("{} {}", style("[ERROR]").red(), e);
-            std::process::exit(1);
-        });
+    // Assemble the URLs to probe from the source and/or the --url values.
+    let urls = collect_urls(&options, &client).await.unwrap_or_else(|e| {
+        eprintln!("{} {}", style("[ERROR]").red(), e);
+        std::process::exit(1);
+    });
 
     // Fetch URLs concurrently and generate a report.
     let report = fetch_and_generate_report(urls, &client, &options, &start_time).await?;

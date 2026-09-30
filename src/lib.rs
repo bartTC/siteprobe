@@ -1,5 +1,5 @@
-//! Siteprobe fetches all URLs from a `sitemap.xml`, checks their existence,
-//! and generates performance reports.
+//! Siteprobe fetches all URLs from a `sitemap.xml` or a plain-text URL list,
+//! checks their existence, and generates performance reports.
 //!
 //! This library interface exists primarily so the binary and the integration
 //! tests can share the same modules; it is not a stable public API.

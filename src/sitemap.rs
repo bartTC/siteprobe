@@ -1,5 +1,5 @@
 use crate::network::get_url_response;
-use crate::options::Cli;
+use crate::options::{Cli, UrlSource};
 use crate::report::Report;
 use crate::utils;
 use console::style;
@@ -20,24 +20,46 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::time::Instant;
+use url::Url;
 
 // region: Structs & Enums
+
+/// The kind of document a URL source turned out to contain.
 #[derive(Debug, PartialEq)]
 pub enum SitemapType {
+    /// A `<sitemapindex>` referencing other sitemaps.
     SitemapIndex,
+    /// A `<urlset>` listing page URLs.
     UrlSet,
+    /// A plain-text list with one URL per line.
+    PlainText,
+    /// Neither a sitemap nor a URL list.
     Unknown,
+}
+
+impl fmt::Display for SitemapType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let label = match self {
+            SitemapType::SitemapIndex => "sitemap index",
+            SitemapType::UrlSet => "sitemap",
+            SitemapType::PlainText => "URL list",
+            SitemapType::Unknown => "unknown document",
+        };
+        write!(f, "{label}")
+    }
+}
+
+/// Result of parsing a plain-text URL list.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct UrlList {
+    /// Lines that parsed as absolute http(s) URLs, in input order.
+    pub urls: Vec<String>,
+    /// Non-blank, non-comment lines that are not valid http(s) URLs.
+    pub invalid_lines: Vec<String>,
 }
 
 /// A non-keyed, in-memory rate limiter shared by all request tasks.
 type DirectRateLimiter = RateLimiter<NotKeyed, InMemoryState, DefaultClock>;
-
-// Implement Display for SitemapType
-impl fmt::Display for SitemapType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
 // endregion
 
 // region: Functions
@@ -50,37 +72,90 @@ pub fn decompress_gzip(bytes: &[u8]) -> Result<String, Box<dyn Error>> {
     Ok(decompressed)
 }
 
-/// Checks if the content is gzip-compressed, either by URL suffix
-/// or by inspecting the gzip magic bytes (0x1f, 0x8b).
-pub fn is_gzip_content(url: &str, bytes: &[u8]) -> bool {
-    if url.ends_with(".gz") {
+/// Checks if the content is gzip-compressed, either by the `.gz` suffix of
+/// its name (URL or file path) or by inspecting the gzip magic bytes (0x1f, 0x8b).
+pub fn is_gzip_content(name: &str, bytes: &[u8]) -> bool {
+    if name.ends_with(".gz") {
         return true;
     }
     // Check for gzip magic number
     bytes.len() >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b
 }
 
-/// Fetches a sitemap URL, automatically decompressing gzip content if detected.
-async fn get_sitemap_content(url: &str, client: &Client) -> Result<String, Box<dyn Error>> {
-    let response = client.get(url).send().await?.error_for_status()?;
-    let bytes = response.bytes().await?;
-
-    if is_gzip_content(url, &bytes) {
-        decompress_gzip(&bytes)
-    } else {
-        Ok(String::from_utf8(bytes.to_vec())?)
+/// Reads the raw bytes of a URL source.
+async fn read_source(source: &UrlSource, client: &Client) -> Result<Vec<u8>, Box<dyn Error>> {
+    match source {
+        UrlSource::Remote(url) => {
+            let response = client.get(url.as_str()).send().await?.error_for_status()?;
+            Ok(response.bytes().await?.to_vec())
+        }
+        UrlSource::File(path) => Ok(tokio::fs::read(path).await?),
+        UrlSource::Stdin => {
+            // Stdin is read once, up front, before any concurrent work starts,
+            // so a blocking read is fine here.
+            let mut bytes = Vec::new();
+            std::io::stdin().read_to_end(&mut bytes)?;
+            Ok(bytes)
+        }
     }
 }
 
-pub async fn get_sitemap_urls(
-    sitemap_url: &str,
+/// Loads a URL source as text, automatically decompressing gzip content if detected.
+async fn get_source_content(source: &UrlSource, client: &Client) -> Result<String, Box<dyn Error>> {
+    let bytes = read_source(source, client).await?;
+
+    if is_gzip_content(&source.to_string(), &bytes) {
+        decompress_gzip(&bytes)
+    } else {
+        Ok(String::from_utf8(bytes)?)
+    }
+}
+
+/// Fetches a sitemap referenced by URL from a sitemap index.
+async fn get_remote_content(url: &str, client: &Client) -> Result<String, Box<dyn Error>> {
+    let source = UrlSource::Remote(Url::parse(url)?);
+    get_source_content(&source, client).await
+}
+
+/// Assembles the full list of URLs to probe: the `--url` values plus, if a
+/// source was given, every URL extracted from it. The result is sorted and
+/// deduplicated.
+pub async fn collect_urls(options: &Cli, client: &Client) -> Result<Vec<String>, Box<dyn Error>> {
+    let quiet = options.json;
+    let mut urls: Vec<String> = options.urls.iter().map(Url::to_string).collect();
+
+    match &options.source {
+        Some(source) => urls.extend(get_source_urls(source, client, quiet).await?),
+        None => {
+            if !quiet {
+                println!(
+                    "{} 🔎 Using URLs from the command line...",
+                    style("[1/3]").dim()
+                );
+                println!("{} 🚚 Collect all URLs...", style("[2/3]").dim());
+            }
+        }
+    }
+
+    // Deduplicate URLs - a URL might appear in multiple sitemap files, or
+    // both in the source and on the command line.
+    urls.sort();
+    urls.dedup();
+
+    Ok(urls)
+}
+
+/// Loads a source and extracts all URLs from it, following sitemap index
+/// references to other sitemaps.
+async fn get_source_urls(
+    source: &UrlSource,
     client: &Client,
     quiet: bool,
 ) -> Result<Vec<String>, Box<dyn Error>> {
-    let content = match get_sitemap_content(sitemap_url, client).await {
+    let content = match get_source_content(source, client).await {
         Ok(content) => content,
         Err(e) => {
-            return Err(format!("Unable to fetch sitemap: {}", e).into());
+            return Err(format!("Unable to load {}: {}", source, e).into());
         }
     };
 
@@ -90,67 +165,107 @@ pub async fn get_sitemap_urls(
     }
 
     if sitemap_type == SitemapType::Unknown {
-        return Err(format!("The sitemap does not contain any URLs: {}", sitemap_url).into());
+        return Err(format!(
+            "The source does not contain any URLs (expected a sitemap.xml or a plain-text list of URLs): {}",
+            source
+        )
+        .into());
     }
 
-    // A sitemap.xml file might be an index file, linking to other sitemaps.
-    // In that case, retrieve the urls from all those sitemaps.
     let mut urls = Vec::new();
 
     if !quiet {
-        println!(
-            "{} 🚚 Collect all URLs from sitemap...",
-            style("[2/3]").dim()
-        );
+        println!("{} 🚚 Collect all URLs...", style("[2/3]").dim());
     }
-    if sitemap_type == SitemapType::SitemapIndex {
-        let sitemap_urls = extract_sitemap_urls(&content);
-        for sitemap_url in sitemap_urls {
-            match get_sitemap_content(&sitemap_url, client).await {
-                Ok(content) => {
-                    urls.extend(extract_sitemap_urls(&content));
+    match sitemap_type {
+        // A sitemap.xml file might be an index file, linking to other sitemaps.
+        // In that case, retrieve the urls from all those sitemaps.
+        SitemapType::SitemapIndex => {
+            for sitemap_url in extract_sitemap_urls(&content) {
+                match get_remote_content(&sitemap_url, client).await {
+                    Ok(content) => urls.extend(extract_sitemap_urls(&content)),
+                    Err(_) => {
+                        eprintln!(
+                            "{} The referenced sitemap is missing: {}",
+                            style("[ERROR]").red(),
+                            sitemap_url
+                        );
+                    }
                 }
-                Err(_) => {
-                    eprintln!(
-                        "{} The referenced sitemap is missing: {}",
-                        style("[ERROR]").red(),
-                        sitemap_url
-                    );
-                }
-            };
+            }
         }
-    } else if sitemap_type == SitemapType::UrlSet {
-        urls.extend(extract_sitemap_urls(&content));
+        SitemapType::UrlSet => urls.extend(extract_sitemap_urls(&content)),
+        SitemapType::PlainText => {
+            let list = parse_url_list(&content);
+            for line in &list.invalid_lines {
+                eprintln!(
+                    "{} Skipping line that is not an http(s) URL: {}",
+                    style("[WARN]").yellow(),
+                    line
+                );
+            }
+            urls.extend(list.urls);
+        }
+        SitemapType::Unknown => unreachable!("handled above"),
     }
-
-    // Deduplicate URLs - a URL might appear in multiple sitemap files
-    urls.sort();
-    urls.dedup();
 
     Ok(urls)
 }
 
-pub fn identify_sitemap_type(xml: &str) -> SitemapType {
+/// Classifies content as a sitemap index, a sitemap, or a plain-text URL list.
+pub fn identify_sitemap_type(content: &str) -> SitemapType {
+    if let Some(sitemap_type) = identify_xml_root(content) {
+        return sitemap_type;
+    }
+
+    if parse_url_list(content).urls.is_empty() {
+        SitemapType::Unknown
+    } else {
+        SitemapType::PlainText
+    }
+}
+
+/// Classifies XML content by its root element. Returns `None` if there is no
+/// root element at all, i.e. the content is not XML.
+fn identify_xml_root(xml: &str) -> Option<SitemapType> {
     let mut reader = Reader::from_str(xml);
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) => {
-                return match e.name().as_ref() {
+                return Some(match e.name().as_ref() {
                     "sitemapindex" => SitemapType::SitemapIndex,
                     "urlset" => SitemapType::UrlSet,
                     _ => SitemapType::Unknown,
-                };
+                });
             }
-            Ok(Event::Eof) => break, // End of file
-            Err(_) => return SitemapType::Unknown,
+            Ok(Event::Eof) => return None,
+            Err(_) => return None,
             _ => {} // Ignore other events
         }
         buf.clear();
     }
+}
 
-    SitemapType::Unknown
+/// Parses a plain-text URL list: one URL per line. Blank lines and lines
+/// starting with `#` are ignored. Valid URLs are normalized through `Url`,
+/// so they compare equal to the `--url` values.
+pub fn parse_url_list(text: &str) -> UrlList {
+    let mut list = UrlList::default();
+
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        match Url::parse(line) {
+            Ok(url) if utils::is_http_url(&url) => list.urls.push(url.to_string()),
+            _ => list.invalid_lines.push(line.to_string()),
+        }
+    }
+
+    list
 }
 
 /// Extracts all <loc> URLs from a sitemap.xml string
@@ -183,11 +298,11 @@ pub fn extract_sitemap_urls(xml: &str) -> Vec<String> {
 }
 // endregion
 
-/// Fetches URLs concurrently from the sitemap and generates a report.
+/// Fetches all collected URLs concurrently and generates a report.
 ///
 /// # Arguments
 ///
-/// * `urls` - A vector of URL strings fetched from the sitemap.
+/// * `urls` - The URLs to probe, as assembled by [`collect_urls`].
 /// * `client` - A shared, configured HTTP client.
 /// * `semaphore` - A semaphore controlling the concurrency level.
 /// * `options` - CLI options controlling aspects like output directory and request modifications.
@@ -314,7 +429,7 @@ pub async fn fetch_and_generate_report(
     }
 
     Ok(Report {
-        sitemap_url: options.sitemap_url.to_string(),
+        source: options.source_label(),
         concurrency_limit: options.concurrency_limit,
         rate_limit: options.rate_limit,
         total_time: start_time.elapsed(),
