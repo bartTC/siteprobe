@@ -46,6 +46,15 @@ test *args:
         cargo test
     fi
 
+# Build the website (landing page + rendered docs) into _site/
+site:
+    ./scripts/build-site.sh
+
+# Build the website and serve it at http://localhost:8000/
+serve-site: site
+    @echo "Serving http://localhost:8000/ (Ctrl-C to stop)"
+    python3 -m http.server --directory _site 8000
+
 # Perform a full release: test, update changelog, commit, tag, push
 release:
     #!/usr/bin/env bash

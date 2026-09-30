@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Siteprobe · Check every URL in a sitemap</title>
+<meta name="description" content="Siteprobe is a command-line tool that fetches every URL from a sitemap.xml or a plain URL list, checks that each one exists, and reports response times. Reports as CSV, JSON, or HTML, and exit codes for use in CI.">
+<meta name="color-scheme" content="light dark">
+<meta property="og:title" content="Siteprobe">
+<meta property="og:description" content="A command-line tool that fetches every URL from a sitemap or a URL list, checks that it exists, and reports how long it took.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://barttc.github.io/siteprobe/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%23e8551c' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23e8551c'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./" aria-label="Siteprobe home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="var(--accent-hi)" stroke-width="3"/><circle cx="16" cy="16" r="4" fill="var(--accent-hi)"/></svg>
+      siteprobe <span class="ver">v__VERSION__</span>
+    </a>
+    <nav aria-label="Primary">
+      <a href="./" aria-current="page">Home</a>
+      <a href="docs/">README</a>
+      <a class="opt" href="docs/#changelog">Changelog</a>
+      <span class="sep" aria-hidden="true"></span>
+      <a class="opt" href="https://crates.io/crates/siteprobe">crates.io</a>
+      <a class="opt" href="https://pypi.org/project/siteprobe/">PyPI</a>
+      <a href="https://github.com/bartTC/siteprobe">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <div class="eyebrow" aria-hidden="true"></div>
+        <h1>Check every URL in a&nbsp;<em>sitemap.</em></h1>
+        <p class="lead">Siteprobe is a command-line tool written in Rust. It reads a <strong>sitemap.xml</strong> or a plain list of URLs, requests every page concurrently, and reports which ones failed and which ones were slow. Results go to the terminal, or to a CSV, JSON, or HTML file.</p>
+
+        <div class="install-hero">
+          <span class="p" aria-hidden="true">$</span>
+          <code data-copy>brew install bartTC/siteprobe/siteprobe</code>
+        </div>
+        <p class="alts">also <a href="#install">pipx install siteprobe</a> · <a href="#install">cargo install siteprobe</a> · or run it directly with <a href="#install">uvx siteprobe</a></p>
+
+        <div class="cta">
+          <a class="btn primary" href="docs/">Read the README</a>
+          <a class="btn ghost" href="https://github.com/bartTC/siteprobe">Source on GitHub</a>
+        </div>
+
+        <ul class="uses">
+          <li><b>After a deploy</b><span>Request every URL in the sitemap and see whether any of them fail.</span></li>
+          <li><b>Before a launch</b><span>Find 404s, 500s, timeouts, and pages slower than a threshold you set.</span></li>
+          <li><b>In CI</b><span>The exit code reports failed or slow URLs, so a pipeline step can fail on them.</span></li>
+        </ul>
+      </div>
+
+      <div class="term-col">
+        <div class="term" role="img" aria-label="Terminal output of a siteprobe run: three progress steps, then statistics tables for 303 URLs with a 100 percent success rate, response time percentiles, and a list of slow responses.">
+          <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><span>siteprobe — 303 URLs in 2.44 s</span></div>
+          <div class="term-body" aria-hidden="true">
+            <div class="ln"><span class="arrow">❯</span> <span class="cmd-text">siteprobe https://www.lincolnloop.com/sitemap.xml -c 8 -s 0.1</span></div>
+            <div class="ln a" style="--d:1.75s">[1/3] 🔎 Fetch UrlSet...</div>
+            <div class="ln a" style="--d:2.05s">[2/3] 🚚 Collect all URLs from sitemap...</div>
+            <div class="ln a" style="--d:2.3s">[3/3] 📥 [00:00:01] <span class="bar"><i></i></span> Loading URL <span class="a" style="--d:3.35s">303/303 - 🏁 Complete!</span></div>
+            <div class="ln gap"></div>
+            <div class="ln b a" style="--d:3.6s">Statistics for <span class="u">https://www.lincolnloop.com/sitemap.xml</span></div>
+            <div class="ln gap"></div>
+            <div class="row a" style="--d:3.7s">
+              <table class="tt"><tr><td>Concurrency Limit</td><td>8</td></tr><tr><td>Elapsed Time</td><td>2.44s</td></tr><tr><td>Bypass Caching</td><td>No</td></tr></table>
+              <table class="tt"><tr><td>✅ Success Rate</td><td>100%</td></tr><tr><td>🚨 Error Rate</td><td>0%</td></tr><tr><td>🔁 Redirect Rate</td><td>0%</td></tr></table>
+            </div>
+            <div class="ln gap"></div>
+            <div class="ln b a" style="--d:3.85s">Response Time and Performance Statistics:</div>
+            <div class="ln gap"></div>
+            <div class="row a" style="--d:3.95s">
+              <table class="tt">
+                <tr><td>⏱️ Average Response Time</td><td>50.00ms</td></tr>
+                <tr><td>🔹 Median Response Time</td><td>35.00ms</td></tr>
+                <tr><td>🐇 Min Response Time</td><td>32.00ms</td></tr>
+                <tr><td>🐌 Max Response Time</td><td>169.00ms</td></tr>
+                <tr><td>⚖️ P90 Response Time</td><td>48.00ms</td></tr>
+                <tr><td>🎯 P95 Response Time</td><td>49.00ms</td></tr>
+                <tr><td>🚀 P99 Response Time</td><td>45.00ms</td></tr>
+                <tr><td>📉 Standard Deviation</td><td>18.00ms</td></tr>
+              </table>
+              <table class="tt">
+                <tr><td>⚡ Total Requests Processed</td><td>303</td></tr>
+                <tr><td>⏳ Requests Per Second (RPS)</td><td>124.04 / sec</td></tr>
+                <tr><td>📉 Slow Request Percentage</td><td>3%</td></tr>
+                <tr><td>📦 Average Response Size</td><td>54.71kb</td></tr>
+                <tr><td>🔹 Min Response Size</td><td>38.41kb</td></tr>
+                <tr><td>🔺 Max Response Size</td><td>226.73kb</td></tr>
+              </table>
+            </div>
+            <div class="ln gap"></div>
+            <div class="ln b a" style="--d:4.15s">Slow Responses: <span class="tip">≥ 0.1s</span></div>
+            <div class="ln gap"></div>
+            <div class="ln a" style="--d:4.25s"><span class="ok">200 OK</span>: https://lincolnloop.com/success-stories/planned-parenthood/ (169ms)</div>
+            <div class="ln a" style="--d:4.32s"><span class="ok">200 OK</span>: https://lincolnloop.com/privacy/ (167ms)</div>
+            <div class="ln a" style="--d:4.39s"><span class="ok">200 OK</span>: https://lincolnloop.com/success-stories/ (163ms)</div>
+            <div class="ln a" style="--d:4.46s"><span class="ok">200 OK</span>: https://lincolnloop.com/expertise/ (155ms)</div>
+            <div class="ln gap"></div>
+            <div class="ln tip a" style="--d:4.6s">💡 Tip: You can adjust the threshold for slow responses using the `-s` flag.</div>
+            <div class="ln gap"></div>
+            <div class="ln a" style="--d:4.9s"><span class="arrow">❯</span> <span class="cur"></span></div>
+          </div>
+        </div>
+        <p class="fig"><b>Fig. 1</b>A run against a real sitemap: 303 URLs, 8 concurrent requests, 2.44 s in total.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="sources">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="idx">01</span>
+        <h2>Where the URLs come from.</h2>
+        <p>A sitemap, a text file, or URLs given on the command line. The format is detected automatically, so any source may be a sitemap, a sitemap index, or a plain list.</p>
+      </div>
+      <div class="cells stack">
+        <div class="cell">
+          <span class="flag">sitemap.xml</span>
+          <h3>A sitemap, or a sitemap index</h3>
+          <p>Sitemap index files are followed recursively, including nested ones, so one URL covers a whole site.</p>
+          <pre class="cmd"><code data-copy>siteprobe https://example.com/sitemap.xml</code></pre>
+        </div>
+        <div class="cell">
+          <span class="flag">urls.txt · stdin</span>
+          <h3>A plain-text list</h3>
+          <p>One URL per line. Blank lines and <code>#</code> comments are ignored, and anything that is not an http(s) URL is skipped with a warning. Load it from a URL, a local file, or stdin.</p>
+          <pre class="cmd"><code data-copy>siteprobe ./urls.txt
+curl -s https://example.com/sitemap.xml | siteprobe -</code></pre>
+        </div>
+        <div class="cell">
+          <span class="flag">-u, --url</span>
+          <h3>URLs on the command line</h3>
+          <p><code>-u</code> can be repeated, and combined with a source. The URLs are merged and deduplicated.</p>
+          <pre class="cmd"><code data-copy>siteprobe -u https://example.com/ -u https://example.com/pricing</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="features">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="idx">02</span>
+        <h2>Options.</h2>
+        <p>Concurrency and rate limits, authentication, redirects, retries, and a threshold for slow responses. Most of these can also be set in a config file.</p>
+      </div>
+      <div class="cells">
+        <div class="cell">
+          <span class="flag">-c, --concurrency-limit</span>
+          <h3>Concurrency limit</h3>
+          <p>The number of requests in flight at once. The default is 4.</p>
+        </div>
+        <div class="cell">
+          <span class="flag">-l, --rate-limit</span>
+          <h3>Rate limit</h3>
+          <p>A cap for the whole run, written as requests per time span: <code>-l 300/5m</code> for 300 requests per 5 minutes, or <code>-l 100/1h</code>. Units are <code>s</code>, <code>m</code>, and <code>h</code>.</p>
+        </div>
+        <div class="cell">
+          <span class="flag">-t, --request-timeout · --retries</span>
+          <h3>Timeouts and retries</h3>
+          <p>A per-request timeout, 10 seconds by default, and an optional number of retries for network errors and 5xx responses.</p>
+        </div>
+        <div class="cell">
+          <span class="flag">--basic-auth · -H, --header</span>
+          <h3>Authentication</h3>
+          <p>Basic authentication, or any custom header such as a bearer token or a session cookie. <code>-H</code> can be repeated.</p>
+        </div>
+        <div class="cell">
+          <span class="flag">-f, --follow-redirects</span>
+          <h3>Redirects</h3>
+          <p>Redirects are only followed when enabled, up to 10 per URL. Basic auth credentials are not forwarded across a redirect.</p>
+        </div>
+        <div class="cell">
+          <span class="flag">-s, --slow-threshold</span>
+          <h3>Slow threshold</h3>
+          <p>A threshold in seconds, such as <code>3</code> or <code>0.05</code>. Responses above it are listed in the report, and the run exits with code 3.</p>
+        </div>
+        <div class="cell">
+          <span class="flag">-a, --append-timestamp</span>
+          <h3>Cache bypass</h3>
+          <p>Appends a random timestamp to every URL, so that caches are bypassed and the origin answers each request.</p>
+        </div>
+        <div class="cell">
+          <span class="flag">-o, --output-dir</span>
+          <h3>Save the documents</h3>
+          <p>Writes every downloaded document to a directory, for inspection or as a static mirror of the site.</p>
+        </div>
+        <div class="cell">
+          <span class="flag">--config · .siteprobe.toml</span>
+          <h3>Config file</h3>
+          <p>Options can be set in <code>.siteprobe.toml</code> in the current directory, or in a file given with <code>--config</code>. Command-line flags take precedence.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="reports">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="idx">03</span>
+        <h2>Reports.</h2>
+        <p>Every run prints statistics to the terminal. A report can also be written to a file, or printed as JSON to stdout.</p>
+      </div>
+      <div class="cells two">
+        <div class="cell">
+          <span class="flag">-r, --report-path</span>
+          <h3>CSV</h3>
+          <p>One row per URL: status code, response time in milliseconds, and response size.</p>
+        </div>
+        <div class="cell">
+          <span class="flag">-j, --report-path-json</span>
+          <h3>JSON</h3>
+          <p>The full report, including the source of the URLs and every per-URL result.</p>
+        </div>
+        <div class="cell">
+          <span class="flag">--report-path-html</span>
+          <h3>HTML</h3>
+          <p>A single self-contained HTML file with a sortable table.</p>
+        </div>
+        <div class="cell">
+          <span class="flag">--json</span>
+          <h3>JSON on stdout</h3>
+          <p>Prints the JSON report to stdout and suppresses all other output, for piping into other tools.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="install">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="idx">04</span>
+        <h2>Installation.</h2>
+        <p>Available from Homebrew, PyPI, and crates.io. Each release also ships prebuilt binaries for macOS, Linux, and Windows.</p>
+      </div>
+      <div class="cells two">
+        <div class="cell">
+          <span class="flag">Homebrew · macOS, Linux</span>
+          <pre class="cmd"><code data-copy>brew install bartTC/siteprobe/siteprobe</code></pre>
+        </div>
+        <div class="cell">
+          <span class="flag">Run without installing</span>
+          <pre class="cmd"><code data-copy>uvx siteprobe https://example.com/sitemap.xml
+pipx run siteprobe https://example.com/sitemap.xml</code></pre>
+        </div>
+        <div class="cell">
+          <span class="flag">pip · pipx</span>
+          <pre class="cmd"><code data-copy>pipx install siteprobe
+pip install siteprobe</code></pre>
+        </div>
+        <div class="cell">
+          <span class="flag">Cargo</span>
+          <pre class="cmd"><code data-copy>cargo install siteprobe</code></pre>
+        </div>
+      </div>
+      <div class="src">
+        <p>Binaries and a shell installer for each release are on <a href="https://github.com/bartTC/siteprobe/releases">GitHub Releases</a>. Building from source requires Rust 1.86 or newer.</p>
+        <pre class="cmd"><code data-copy>git clone https://github.com/bartTC/siteprobe.git
+cd siteprobe
+cargo build --release</code></pre>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Siteprobe · MIT License · by <a href="https://github.com/bartTC">Martin Mahner</a></span>
+    <nav aria-label="Footer">
+      <a href="./">Home</a>
+      <a href="docs/">README</a>
+      <a href="docs/#changelog">Changelog</a>
+      <span class="sep" aria-hidden="true"></span>
+      <a href="https://github.com/bartTC/siteprobe">GitHub</a>
+      <a href="https://crates.io/crates/siteprobe">crates.io</a>
+      <a href="https://pypi.org/project/siteprobe/">PyPI</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  // Copy buttons for every command block. Comment lines are dropped from the copied text.
+  document.querySelectorAll('[data-copy]').forEach(function (code) {
+    if (!navigator.clipboard) return;
+    var btn = document.createElement('button');
+    btn.className = 'copy';
+    btn.type = 'button';
+    btn.textContent = 'Copy';
+    btn.setAttribute('aria-label', 'Copy command to clipboard');
+    btn.addEventListener('click', function () {
+      var text = code.innerText.split('\n').filter(function (l) { return !/^\s*#/.test(l); }).join('\n').trim();
+      navigator.clipboard.writeText(text).then(function () {
+        btn.textContent = 'Copied';
+        btn.classList.add('done');
+        setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 1600);
+      });
+    });
+    code.parentElement.appendChild(btn);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }} · Documentation</title>
+<meta name="description" content="{{ title }} documentation: usage, options, and changelog.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%23e8551c' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23e8551c'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../site.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="../" aria-label="Siteprobe home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="var(--accent-hi)" stroke-width="3"/><circle cx="16" cy="16" r="4" fill="var(--accent-hi)"/></svg>
+      siteprobe <span class="ver">v__VERSION__</span>
+    </a>
+    <nav aria-label="Primary">
+      <a href="../">Home</a>
+      <a href="./">README</a>
+      <a href="#changelog">Changelog</a>
+      <span class="sep" aria-hidden="true"></span>
+      <a class="opt" href="https://crates.io/crates/siteprobe">crates.io</a>
+      <a class="opt" href="https://pypi.org/project/siteprobe/">PyPI</a>
+      <a href="{{ repo_url }}">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap docs">
+  <aside class="side">
+    <p class="doc-title" id="doc-title"></p>
+    <button class="toc-toggle" type="button" aria-expanded="false" aria-controls="toc">On this page</button>
+    <p class="toc-title">On this page</p>
+    <nav class="toc" id="toc" aria-label="Table of contents"></nav>
+  </aside>
+
+  <div class="prose">
+    {%- for section in sections %}
+    <article class="doc" id="doc-{{ section.id }}" data-section="{{ section.id }}" data-name="{{ section.name }}" hidden>
+      {{ section.html }}
+    </article>
+    {%- endfor %}
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Siteprobe · MIT License · by <a href="https://github.com/bartTC">Martin Mahner</a> · <span class="build">{{ build_timestamp }}</span></span>
+    <nav aria-label="Footer">
+      <a href="../">Home</a>
+      <a href="./">README</a>
+      <a href="#changelog">Changelog</a>
+      <span class="sep" aria-hidden="true"></span>
+      <a href="{{ repo_url }}">GitHub</a>
+      <a href="https://crates.io/crates/siteprobe">crates.io</a>
+      <a href="https://pypi.org/project/siteprobe/">PyPI</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var sections = Array.prototype.slice.call(document.querySelectorAll('.doc'));
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll('.top nav a'));
+  var toc = document.getElementById('toc');
+  var toggle = document.querySelector('.toc-toggle');
+  var docTitle = document.getElementById('doc-title');
+  // Keep a Changelog category headings repeat under every version and only add noise to the TOC.
+  var skipInToc = /^(added|changed|deprecated|removed|fixed|security)$/i;
+
+  // Heading ids are prefixed with their section id ("readme-usage"), so the hash tells us which section to show.
+  // The articles themselves use "doc-" ids on purpose: a hash like "#changelog" must not match an element,
+  // or the browser would scroll to the article whenever the layout shifts and override our scrolling.
+  function sectionFor(hash) {
+    var id = hash.replace(/^#/, '');
+    for (var i = 0; i < sections.length; i++) {
+      var name = sections[i].dataset.section;
+      if (id === name || id.indexOf(name + '-') === 0) return sections[i];
+    }
+    return sections[0];
+  }
+
+  function escapeHtml(text) {
+    return text.replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function buildToc(section) {
+    var headings = section.querySelectorAll('h2, h3');
+    var items = '';
+    for (var i = 0; i < headings.length; i++) {
+      var h = headings[i];
+      var text = h.textContent.trim();
+      if (h.tagName === 'H3' && skipInToc.test(text)) continue;
+      items += '<li class="' + h.tagName.toLowerCase() + '"><a href="#' + h.id + '">' + escapeHtml(text) + '</a></li>';
+    }
+    toc.innerHTML = '<ul>' + items + '</ul>';
+  }
+
+  function route() {
+    var section = sectionFor(location.hash);
+    var targetId = location.hash.replace(/^#/, '');
+    sections.forEach(function (s) { s.hidden = s !== section; });
+    docTitle.textContent = section.dataset.name;
+    // "README" (href "./") stands for the first section; the others are linked by hash.
+    navLinks.forEach(function (link) {
+      var href = link.getAttribute('href');
+      var current = href === '#' + section.dataset.section || (section === sections[0] && href === './');
+      if (current) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    });
+    buildToc(section);
+    scrollToHash();
+    spy();
+  }
+
+  // A hash that names a section ("#changelog") switches tabs and starts at the top;
+  // a heading id inside a section scrolls to that heading.
+  function scrollToHash() {
+    var targetId = location.hash.replace(/^#/, '');
+    var section = sectionFor(location.hash);
+    var target = targetId && targetId !== section.dataset.section ? document.getElementById(targetId) : null;
+    if (target) target.scrollIntoView();
+    else if (targetId === section.dataset.section) window.scrollTo(0, 0);
+  }
+
+  // Highlight the TOC entry of the last heading that has scrolled past the top of the viewport.
+  function spy() {
+    var links = toc.querySelectorAll('a');
+    var current = null;
+    for (var i = 0; i < links.length; i++) {
+      var el = document.getElementById(links[i].getAttribute('href').slice(1));
+      if (el && el.getBoundingClientRect().top <= 96) current = links[i];
+    }
+    for (var j = 0; j < links.length; j++) links[j].classList.toggle('active', links[j] === current);
+  }
+
+  var ticking = false;
+  window.addEventListener('scroll', function () {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function () { ticking = false; spy(); });
+  });
+  window.addEventListener('hashchange', route);
+  // The browser scrolls to the fragment once loading finishes, after route() ran; redo our scroll then.
+  window.addEventListener('load', scrollToHash);
+  toggle.addEventListener('click', function () {
+    var open = toc.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  route();
+})();
+</script>
+</body>
+</html>
