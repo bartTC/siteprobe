@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-30
+
 ### Added
 
 - Plain-text URL lists as an alternative to `sitemap.xml`: one URL per line,
@@ -200,7 +202,8 @@ stability and maturity, making it suitable for a v1.0 release.
 
 - Initial release with all core features.
 
-[unreleased]: https://github.com/bartTC/siteprobe/compare/v1.4.0...HEAD
+[unreleased]: https://github.com/bartTC/siteprobe/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/bartTC/siteprobe/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/bartTC/siteprobe/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/bartTC/siteprobe/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/bartTC/siteprobe/compare/v1.2.1...v1.2.2
