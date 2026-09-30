@@ -82,11 +82,46 @@ pub fn is_gzip_content(name: &str, bytes: &[u8]) -> bool {
     bytes.len() >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b
 }
 
+/// Describes a source that answered with a redirect instead of content.
+///
+/// The client only follows redirects with `--follow-redirects`, so without it
+/// a redirected sitemap URL would otherwise yield the redirect's HTML body,
+/// which then gets reported as "no URLs found" and hides the real cause.
+fn describe_redirect(requested: &Url, response: &reqwest::Response) -> String {
+    let target = response
+        .headers()
+        .get(reqwest::header::LOCATION)
+        .and_then(|value| value.to_str().ok())
+        .map(|location| {
+            // Resolve relative targets so the URL can be used as-is.
+            requested
+                .join(location)
+                .map(|url| url.to_string())
+                .unwrap_or_else(|_| location.to_string())
+        });
+
+    match target {
+        Some(target) => format!(
+            "the server redirects ({}) to {}. Use that URL as the source, or pass --follow-redirects",
+            response.status(),
+            target
+        ),
+        None => format!(
+            "the server responded with {} and no Location header",
+            response.status()
+        ),
+    }
+}
+
 /// Reads the raw bytes of a URL source.
 async fn read_source(source: &UrlSource, client: &Client) -> Result<Vec<u8>, Box<dyn Error>> {
     match source {
         UrlSource::Remote(url) => {
-            let response = client.get(url.as_str()).send().await?.error_for_status()?;
+            let response = client.get(url.as_str()).send().await?;
+            if response.status().is_redirection() {
+                return Err(describe_redirect(url, &response).into());
+            }
+            let response = response.error_for_status()?;
             Ok(response.bytes().await?.to_vec())
         }
         UrlSource::File(path) => Ok(tokio::fs::read(path).await?),
@@ -184,11 +219,12 @@ async fn get_source_urls(
             for sitemap_url in extract_sitemap_urls(&content) {
                 match get_remote_content(&sitemap_url, client).await {
                     Ok(content) => urls.extend(extract_sitemap_urls(&content)),
-                    Err(_) => {
+                    Err(e) => {
                         eprintln!(
-                            "{} The referenced sitemap is missing: {}",
+                            "{} Unable to load the referenced sitemap {}: {}",
                             style("[ERROR]").red(),
-                            sitemap_url
+                            sitemap_url,
+                            e
                         );
                     }
                 }

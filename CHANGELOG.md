@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A `SOURCE` URL that answers with a redirect now fails with an error naming
+  the status and the redirect target, and suggests using the target URL or
+  `--follow-redirects`. Previously the redirect's HTML body was reported as
+  "does not contain any URLs", which hid the actual cause. The same applies to
+  sitemaps referenced from a sitemap index, which now report why they could
+  not be loaded instead of being called missing.
+
 ## [1.5.0] - 2026-09-30
 
 ### Added

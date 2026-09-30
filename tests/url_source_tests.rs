@@ -312,6 +312,77 @@ fn test_source_without_any_urls_fails() {
     );
 }
 
+#[tokio::test]
+async fn test_remote_source_redirect_fails_with_target_and_hint() {
+    let server = MockServer::start().await;
+    let base = server.uri();
+    let target = format!("{}/real-sitemap.xml", base);
+
+    Mock::given(method("GET"))
+        .and(path("/sitemap.xml"))
+        .respond_with(
+            ResponseTemplate::new(301)
+                .insert_header("Location", target.as_str())
+                .set_body_string("<html><body>301 Moved Permanently</body></html>"),
+        )
+        .mount(&server)
+        .await;
+
+    let output = run_json(&[&format!("{}/sitemap.xml", base)], None);
+    assert!(
+        !output.status.success(),
+        "Should fail when the source redirects"
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("301 Moved Permanently"),
+        "stderr should name the redirect status: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains(&target),
+        "stderr should name the redirect target: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("--follow-redirects"),
+        "stderr should mention the flag: {}",
+        stderr
+    );
+    assert!(
+        !stderr.contains("does not contain any URLs"),
+        "the redirect body must not be reported as an empty source: {}",
+        stderr
+    );
+}
+
+#[tokio::test]
+async fn test_remote_source_redirect_resolves_relative_location() {
+    let server = MockServer::start().await;
+    let base = server.uri();
+
+    Mock::given(method("GET"))
+        .and(path("/sitemap.xml"))
+        .respond_with(
+            ResponseTemplate::new(302)
+                .insert_header("Location", "/real-sitemap.xml")
+                .set_body_string(""),
+        )
+        .mount(&server)
+        .await;
+
+    let output = run_json(&[&format!("{}/sitemap.xml", base)], None);
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(&format!("{}/real-sitemap.xml", base)),
+        "a relative Location should be resolved against the source URL: {}",
+        stderr
+    );
+}
+
 #[test]
 fn test_empty_stdin_fails() {
     let output = run_json(&["-"], Some(""));
